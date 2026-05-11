@@ -369,6 +369,7 @@ JKRHeap* daPy_anmHeap_c::setAnimeHeap() {
 #if !PLATFORM_WII
 #if TARGET_PC
 #include "dusk/dvd_asset.hpp"
+#include "dusk/vr/vr.hpp"
 using GameVersion = dusk::version::GameVersion;
 static const u8* l_sightDL_get() { 
     static u8 buf[0x89];
@@ -391,8 +392,22 @@ static const u8* l_sightDL_get() {
 #include "assets/l_sightDL__d_a_player.h"
 #endif
 
+static void set_sight_projected_mtx(daPy_sightPacket_c* packet) {
+    Vec proj;
+    mDoLib_project(packet->getPosP(), &proj);
+    mDoMtx_stack_c::transS(proj.x, proj.y, proj.z);
+    mDoMtx_stack_c::scaleM(32.0f, 32.0f, 32.0f);
+    mDoMtx_copy(mDoMtx_stack_c::get(), packet->mProjMtx);
+}
+
 void daPy_sightPacket_c::draw() {
     TGXTexObj texObj;
+
+#if TARGET_PC
+    if (dusk::vr::active()) {
+        set_sight_projected_mtx(this);
+    }
+#endif
 
     j3dSys.reinitGX();
     GXSetNumIndStages(0);
@@ -419,12 +434,13 @@ void daPy_sightPacket_c::draw() {
 }
 
 void daPy_sightPacket_c::setSight() {
-    Vec proj;
-    mDoLib_project(&mPos, &proj);
-    mDoMtx_stack_c::transS(proj.x, proj.y, proj.z);
-    mDoMtx_stack_c::scaleM(32.0f, 32.0f, 32.0f);
-    mDoMtx_copy(mDoMtx_stack_c::get(), mProjMtx);
-    dComIfGd_set2DXlu(this);
+#if TARGET_PC
+    if (!dusk::vr::active())
+#endif
+    {
+        set_sight_projected_mtx(this);
+    }
+    dComIfGd_setWorldProjected2DXlu(this);
 }
 
 void daPy_sightPacket_c::setSightImage(ResTIMG* i_img) {

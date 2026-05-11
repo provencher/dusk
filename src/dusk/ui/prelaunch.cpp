@@ -639,6 +639,7 @@ void ensure_initialized() noexcept {
         verification_from_config(getSettings().backend.isoVerification.getValue());
     state.initialLanguage = getSettings().game.language;
     state.initialGraphicsBackend = getSettings().backend.graphicsBackend;
+    state.initialXrMode = getSettings().backend.xrMode;
     state.initialCardFileType = getSettings().backend.cardFileType;
     state.errorString.clear();
     state.initialized = true;
@@ -657,6 +658,9 @@ bool is_restart_pending() noexcept {
         return true;
     }
     if (getSettings().backend.graphicsBackend.getValue() != state.initialGraphicsBackend) {
+        return true;
+    }
+    if (getSettings().backend.xrMode.getValue() != state.initialXrMode) {
         return true;
     }
     if (getSettings().game.language.getValue() != state.initialLanguage) {

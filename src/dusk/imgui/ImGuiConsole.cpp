@@ -18,8 +18,10 @@
 #include "dusk/dusk.h"
 #include "dusk/frame_interpolation.h"
 #include "dusk/livesplit.h"
+#include "dusk/logging.h"
 #include "dusk/main.h"
 #include "dusk/settings.h"
+#include "dusk/vr/vr.hpp"
 #include "dusk/ui/ui.hpp"
 #include "f_pc/f_pc_manager.h"
 #include "f_pc/f_pc_name.h"
@@ -257,6 +259,20 @@ namespace dusk {
             getSettings().video.enableFullscreen.setValue(!getSettings().video.enableFullscreen);
             VISetWindowFullscreen(getSettings().video.enableFullscreen);
             config::Save();
+        }
+
+        if (!ImGui::GetIO().KeyShift && ImGui::IsKeyPressed(ImGuiKey_F8)) {
+            switch (dusk::vr::recenter_from_latest_hmd_pose()) {
+            case dusk::vr::RecenterResult::Success:
+                DuskLog.info("OpenXR recenter updated from latest HMD pose");
+                break;
+            case dusk::vr::RecenterResult::Inactive:
+                DuskLog.warn("OpenXR recenter requested, but XR is not active");
+                break;
+            case dusk::vr::RecenterResult::NoTracking:
+                DuskLog.warn("OpenXR recenter requested, but no valid HMD tracking pose is available yet");
+                break;
+            }
         }
 
         if (ImGui::GetIO().KeyShift && ImGui::IsKeyPressed(ImGuiKey_F1)) {

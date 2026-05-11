@@ -3,6 +3,7 @@
 #include "button.hpp"
 #include "document.hpp"
 #include "dusk/iso_validate.hpp"
+#include "dusk/settings.h"
 
 #include <memory>
 #include <string>
@@ -49,6 +50,7 @@ struct PrelaunchState {
     iso::DiscInfo activeDiscInfo{};
     GameLanguage initialLanguage = GameLanguage::English;
     std::string initialGraphicsBackend;
+    XrMode initialXrMode = XrMode::Disabled;
     int initialCardFileType = 0;
     std::string errorString;
     std::string pendingDiscPath;

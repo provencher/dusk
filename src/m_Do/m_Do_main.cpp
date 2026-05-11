@@ -62,6 +62,7 @@
 #include "dusk/ui/prelaunch.hpp"
 #include "dusk/ui/preset.hpp"
 #include "dusk/ui/ui.hpp"
+#include "dusk/vr/vr.hpp"
 #include "version.h"
 
 #include <aurora/aurora.h>
@@ -205,6 +206,7 @@ bool launchUILoop() {
             continue;
         }
 
+        dusk::vr::begin_frame();
         dusk::ui::update();
 
         dusk::g_imguiConsole.PreDraw();
@@ -291,6 +293,7 @@ void main01(void) {
             continue;
         }
 
+        dusk::vr::begin_frame();
         VIWaitForRetrace();
 
         dusk::lastFrameAuroraStats = *aurora_get_stats();
@@ -392,6 +395,44 @@ static AuroraBackend ResolveDesiredBackend(const cxxopts::ParseResult& parsedArg
     }
 
     return desiredBackend;
+}
+
+struct StartupXrPolicy {
+    AuroraBackend desiredBackend = BACKEND_AUTO;
+    bool enableOpenXR = false;
+    bool requireOpenXR = false;
+};
+
+static StartupXrPolicy ResolveStartupXrPolicy(AuroraBackend desiredBackend) {
+    StartupXrPolicy policy{
+        .desiredBackend = desiredBackend,
+    };
+
+    const dusk::XrMode xrMode = dusk::getSettings().backend.xrMode.getValue();
+    if (xrMode == dusk::XrMode::Disabled) {
+        return policy;
+    }
+
+    const bool required = xrMode == dusk::XrMode::Required;
+    if (!IsBackendAvailable(BACKEND_VULKAN)) {
+        if (required) {
+            DuskLog.fatal("OpenXR is Required, but the Vulkan backend is unavailable in this build/runtime");
+        }
+        DuskLog.warn("OpenXR requested, but Vulkan is unavailable; falling back to normal flat startup");
+        return policy;
+    }
+
+    if (desiredBackend != BACKEND_AUTO && desiredBackend != BACKEND_VULKAN) {
+        DuskLog.info("OpenXR requested; forcing Vulkan instead of configured backend '{}'",
+                     dusk::backend_name(desiredBackend));
+    } else {
+        DuskLog.info("OpenXR requested; launching Aurora through Vulkan");
+    }
+
+    policy.desiredBackend = BACKEND_VULKAN;
+    policy.enableOpenXR = true;
+    policy.requireOpenXR = required;
+    return policy;
 }
 
 static void aurora_imgui_init_callback(const AuroraWindowSize* size) {
@@ -713,7 +754,10 @@ int game_main(int argc, char* argv[]) {
         config.windowPosY = -1;
         config.windowWidth = defaultWindowWidth * 2;
         config.windowHeight = defaultWindowHeight * 2;
-        config.desiredBackend = ResolveDesiredBackend(parsed_arg_options);
+        const auto startupXrPolicy = ResolveStartupXrPolicy(ResolveDesiredBackend(parsed_arg_options));
+        config.desiredBackend = startupXrPolicy.desiredBackend;
+        config.enableOpenXR = startupXrPolicy.enableOpenXR;
+        config.requireOpenXR = startupXrPolicy.requireOpenXR;
         config.logCallback = &aurora_log_callback;
         config.logLevel = startupLogLevel;
         config.mem1Size = 256 * 1024 * 1024;
@@ -724,6 +768,17 @@ int game_main(int argc, char* argv[]) {
         config.allowTextureReplacements = true;
         config.allowTextureDumps = false;
         auroraInfo = aurora_initialize(argc, argv, &config);
+        if (startupXrPolicy.enableOpenXR) {
+            if (aurora_xr_is_active()) {
+                DuskLog.info("OpenXR active: {}", aurora_xr_get_status_message());
+            } else if (startupXrPolicy.requireOpenXR) {
+                DuskLog.fatal("OpenXR is Required, but it did not become active: {}",
+                              aurora_xr_get_status_message());
+            } else {
+                DuskLog.warn("OpenXR requested but not active ({}); continuing flat startup",
+                             aurora_xr_get_status_message());
+            }
+        }
     }
 
 #ifdef DUSK_DISCORD

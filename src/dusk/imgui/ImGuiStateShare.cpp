@@ -416,11 +416,18 @@ void ImGuiStateShare::draw(bool& open) {
 }
 
 void ImGuiMenuTools::ShowStateShare() {
-    if (!getSettings().backend.enableAdvancedSettings ||
-        !ImGuiConsole::CheckMenuViewToggle(ImGuiKey_F8, m_showStateShare))
-    {
+    if (!getSettings().backend.enableAdvancedSettings) {
         return;
     }
+
+    if (ImGui::GetIO().KeyShift) {
+        ImGuiConsole::CheckMenuViewToggle(ImGuiKey_F8, m_showStateShare);
+    }
+
+    if (!m_showStateShare) {
+        return;
+    }
+
     m_stateShare.draw(m_showStateShare);
 }
 

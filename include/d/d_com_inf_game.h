@@ -11,6 +11,9 @@
 #include "d/d_drawlist.h"
 #include "d/d_stage.h"
 #include "d/d_save.h"
+#if TARGET_PC
+#include "dusk/vr/vr.hpp"
+#endif
 #include "f_op/f_op_actor.h"
 #include "global.h"
 #include "m_Do/m_Do_controller_pad.h"
@@ -4605,6 +4608,16 @@ inline void dComIfGd_set2DOpa(dDlst_base_c* dlst) {
 
 inline void dComIfGd_set2DXlu(dDlst_base_c* dlst) {
     g_dComIfG_gameInfo.drawlist.set2DXlu(dlst);
+}
+
+inline void dComIfGd_setWorldProjected2DXlu(dDlst_base_c* dlst) {
+#if TARGET_PC
+    if (dusk::vr::active()) {
+        dusk::vr::queue_world_projected_2d(dlst);
+        return;
+    }
+#endif
+    dComIfGd_set2DXlu(dlst);
 }
 
 inline void dComIfGd_set2DOpaTop(dDlst_base_c* dlst) {

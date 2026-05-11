@@ -23,6 +23,14 @@ Launch Dusk through OpenXR with head tracking only. Controller tracking must not
 7. **Recenter by updating app-space offset only.** Recenter uses the latest valid HMD pose to remove lateral offset and yaw from Dusk's XR origin. It does not mutate game camera/orbit state.
 
 ## Work Items
+
+### Orchestration progress
+- [x] 2026-05-11: Work Items 1–2 implemented in `extern/aurora` by sub-agent. Aurora now has XR config/API/status structs, no-op/stub implementation, optional OpenXR probe CMake hook, and build validation. Findings: flat UI quad-layer target is not currently available; launch fallback is flat UI drawn into both eyes. Render overrides are main-frame scoped. Real active XR rendering remains blocked by missing Dawn/WebGPU native Vulkan handle + XR swapchain image interop.
+- [x] 2026-05-11: Work Items 3–4 implemented by sub-agent. Added persistent `backend.xrMode` (`Disabled`/`Optional`/`Required`), prelaunch/settings controls with restart/Vulkan messaging, Dusk startup XR policy that sets Aurora XR flags and handles optional/required fallback, `dusk::vr` service scaffold, frame hooks after `aurora_begin_frame()`, and build validation (`cmake --build --preset macos-default-relwithdebinfo`).
+- [x] 2026-05-11: Work Items 5–6 implemented by sub-agent. Added `EyeViewToken`, per-eye camera composition/restoration, asymmetric projection from Aurora FOV, conservative 120° XR culling in `view_setup()`, and an XR stereo scaffold in `mDoGph_Painter()` that renders world/3D per eye and skips mono post effects in eye passes. Build passed. Runtime eye output still depends on Aurora active XR swapchain interop.
+- [x] 2026-05-11: Work Items 7–8 implemented by sub-agent. Added `dComIfGd_setWorldProjected2DXlu`, queued XR-active world-projected packets, converted player sight and boomerang lock cursor reticles, draws queued packets per eye/fallback, added F8 recenter with yaw+lateral app-origin offset, and moved State Share hotkey to Shift+F8. Build passed; runtime recenter/stereo validation depends on active XR tracking/swapchains.
+- [x] 2026-05-11: Work Item 9 completed by sub-agent. Updated `docs/building.md` with OpenXR/Vulkan prerequisites, `AURORA_ENABLE_OPENXR`, `backend.xrMode`, fallback/blockers, hotkeys, and validation checklist. Final `cmake --build --preset macos-default-relwithdebinfo` and `git diff --check` passed.
+
 1. **Answer Aurora prerequisites first**
    - Locate the Aurora headers/source defining `AuroraConfig`, `aurora_initialize()`, `aurora_begin_frame()`, and render-target handling.
    - Confirm whether Aurora can render RmlUi/ImGui/native flat UI into a separate OpenXR quad-layer target. If not, launch fallback is to draw flat UI into both eyes while still rendering world-targeted UI per eye.

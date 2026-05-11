@@ -13,6 +13,9 @@
 #include "d/actor/d_a_mirror.h"
 #include "Z2AudioLib/Z2Instances.h"
 #include "SSystem/SComponent/c_math.h"
+#if TARGET_PC
+#include "dusk/vr/vr.hpp"
+#endif
 
 int daBoomerang_sight_c::createHeap() {
     void* tmpData;
@@ -336,10 +339,15 @@ void daBoomerang_sight_c::setSight(const cXyz* i_pos, int i_no) {
             m_pos[i_no] = *i_pos;
         }
 
-        Vec proj;
-        mDoLib_project(&m_pos[i_no], &proj);
-        m_proj_posX[i_no] = proj.x;
-        m_proj_posY[i_no] = proj.y;
+#if TARGET_PC
+        if (!dusk::vr::active())
+#endif
+        {
+            Vec proj;
+            mDoLib_project(&m_pos[i_no], &proj);
+            m_proj_posX[i_no] = proj.x;
+            m_proj_posY[i_no] = proj.y;
+        }
     }
 }
 
@@ -357,6 +365,15 @@ void daBoomerang_sight_c::draw() {
 
     for (int i = 0; i < 6; i++, alpha_p++) {
         if (*alpha_p != 0) {
+#if TARGET_PC
+            if (dusk::vr::active()) {
+                Vec proj;
+                mDoLib_project(&m_pos[i], &proj);
+                m_proj_posX[i] = proj.x;
+                m_proj_posY[i] = proj.y;
+            }
+#endif
+
             m_cursorYellowBck->setFrame(field_0x98[i]);
             m_cursorYellowBpk->setFrame(field_0x98[i] > 21.0f ? 21.0f : field_0x98[i]);
 
@@ -469,7 +486,7 @@ int daBoomerang_c::draw() {
         }
 
         if (!dComIfGp_event_runCheck()) {
-            dComIfGd_set2DXlu(&m_sight);
+            dComIfGd_setWorldProjected2DXlu(&m_sight);
         }
     }
 

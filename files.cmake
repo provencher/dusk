@@ -1438,6 +1438,8 @@ set(DUSK_FILES
         src/dusk/stubs.cpp
         src/dusk/update_check.cpp
         src/dusk/update_check.hpp
+        include/dusk/vr/vr.hpp
+        src/dusk/vr/vr.cpp
         #src/dusk/m_Do_ext_dusk.cpp
         src/dusk/imgui/ImGuiConfig.hpp
         src/dusk/imgui/ImGuiConsole.hpp

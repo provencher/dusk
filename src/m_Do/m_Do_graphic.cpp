@@ -38,6 +38,8 @@
 #include "m_Do/m_Do_main.h"
 #include "tracy/Tracy.hpp"
 
+#include <aurora/aurora.h>
+
 #if PLATFORM_WII || PLATFORM_SHIELD
 #include <revolution/sc.h>
 #endif
@@ -57,6 +59,7 @@
 #include "dusk/imgui/ImGuiConsole.hpp"
 #include "dusk/logging.h"
 #include "dusk/settings.h"
+#include "dusk/vr/vr.hpp"
 #endif
 
 class mDoGph_HIO_c : public JORReflexible {
@@ -2115,6 +2118,8 @@ int mDoGph_Painter() {
     dComIfGp_setCurrentGrafPort(&ortho);
     GX_DEBUG_GROUP(dComIfGd_drawCopy2D);
 
+    bool renderedXrStereoWorld = false;
+
     #if DEBUG
     // "↓↓↓↓↓↓↓↓↓↓ CPU time measuring start ↓↓↓↓↓↓↓↓↓↓"
     fapGm_HIO_c::printCpuTimer("\n↓↓↓↓↓↓↓↓↓↓　ＣＰＵ時間計測開始　↓↓↓↓↓↓↓↓↓↓\n");
@@ -2161,59 +2166,85 @@ int mDoGph_Painter() {
             captureScreenSetScissor(&view_port->scissor);
             #endif
 
-            GXSetViewport(view_port->x_orig, view_port->y_orig, view_port->width,
-                          view_port->height, view_port->near_z, view_port->far_z);
-            GXSetScissor(view_port->x_orig, view_port->y_orig, view_port->width,
-                         view_port->height);
-
+            auto make_draw_info_section = [&]() {
 #ifdef TARGET_PC
-            // FRAME INTERP NOTE: Call setViewMtx earlier so that it's interpolated in time for draw_info to use it
-            j3dSys.setViewMtx(camera_p->view.viewMtx);
-            JPADrawInfo draw_info(j3dSys.getViewMtx(), camera_p->view.fovy, camera_p->view.aspect);
-            mDoGph_gInf_c::setWideZoomLightProjection(draw_info.mPrjMtx);
+                // FRAME INTERP NOTE: Call setViewMtx earlier so that it's interpolated in time for draw_info to use it
+                j3dSys.setViewMtx(camera_p->view.viewMtx);
+                JPADrawInfo info(j3dSys.getViewMtx(), camera_p->view.fovy, camera_p->view.aspect);
+                mDoGph_gInf_c::setWideZoomLightProjection(info.mPrjMtx);
 #else
-            JPADrawInfo draw_info(camera_p->view.viewMtx, camera_p->view.fovy, camera_p->view.aspect);
+                JPADrawInfo info(camera_p->view.viewMtx, camera_p->view.fovy, camera_p->view.aspect);
 #endif
 
-            #if 0 && WIDESCREEN_SUPPORT
-            if (mDoGph_gInf_c::isWideZoom()) {
-                Mtx44 sp140;
-                draw_info.getPrjMtx(sp140);
+                #if 0 && WIDESCREEN_SUPPORT
+                if (mDoGph_gInf_c::isWideZoom()) {
+                    Mtx44 sp140;
+                    info.getPrjMtx(sp140);
 
-                sp140[0][0] *= 2.0f;
-                sp140[0][2] = 0.0f;
-                sp140[1][1] *= -2.0f;
-                sp140[1][2] = 0.0f;
-                sp140[2][2] = -2.0f;
-                mDoGph_gInf_c::setWideZoomProjection(sp140);
+                    sp140[0][0] *= 2.0f;
+                    sp140[0][2] = 0.0f;
+                    sp140[1][1] *= -2.0f;
+                    sp140[1][2] = 0.0f;
+                    sp140[2][2] = -2.0f;
+                    mDoGph_gInf_c::setWideZoomProjection(sp140);
 
-                sp140[0][0] *= 0.5f;
-                sp140[0][2] = (0.5f * sp140[0][2]) - 0.5f;
-                sp140[1][1] *= -0.5f;
-                sp140[1][2] = (-0.5f * sp140[1][2]) - 0.5f;
-                sp140[2][2] = 0.0f;
-                draw_info.setPrjMtx(sp140);
-            }
-            #endif
+                    sp140[0][0] *= 0.5f;
+                    sp140[0][2] = (0.5f * sp140[0][2]) - 0.5f;
+                    sp140[1][1] *= -0.5f;
+                    sp140[1][2] = (-0.5f * sp140[1][2]) - 0.5f;
+                    sp140[2][2] = 0.0f;
+                    info.setPrjMtx(sp140);
+                }
+                #endif
 
-            #if DEBUG
-            captureScreenPerspDrawInfo(draw_info);
-            #endif
+                #if DEBUG
+                captureScreenPerspDrawInfo(info);
+                #endif
 
-            dComIfGp_setCurrentWindow(window_p);
-            dComIfGp_setCurrentView(&camera_p->view);
-            dComIfGp_setCurrentViewport(view_port);
-            GXSetProjection(camera_p->view.projMtx, GX_PERSPECTIVE);
+                return info;
+            };
 
-            #if DEBUG
-            captureScreenSetProjection(camera_p->view.projMtx);
-            #endif
+            auto apply_active_camera_section = [&]() {
+                dComIfGp_setCurrentWindow(window_p);
+                dComIfGp_setCurrentView(&camera_p->view);
+                dComIfGp_setCurrentViewport(view_port);
+                GXSetViewport(view_port->x_orig, view_port->y_orig, view_port->width,
+                              view_port->height, view_port->near_z, view_port->far_z);
+                GXSetScissor(view_port->x_orig, view_port->y_orig, view_port->width,
+                             view_port->height);
+                GXSetProjection(camera_p->view.projMtx, GX_PERSPECTIVE);
 
-            PPCSync();
+                #if DEBUG
+                captureScreenSetProjection(camera_p->view.projMtx);
+                #endif
+
+                PPCSync();
 
 #ifndef TARGET_PC
-            j3dSys.setViewMtx(camera_p->view.viewMtx);
+                j3dSys.setViewMtx(camera_p->view.viewMtx);
 #endif
+            };
+
+            JPADrawInfo draw_info = make_draw_info_section();
+            apply_active_camera_section();
+
+            bool preparedWorld3D = false;
+            auto prepare_world_3d_once_section = [&]() {
+                if (preparedWorld3D) {
+                    return;
+                }
+                preparedWorld3D = true;
+#if TARGET_PC
+                if (dusk::getSettings().game.enableFrameInterpolation) {
+                    // FRAME INTERP NOTE: Currently only recalculating points for Epona's reins. Need a more global solution.
+                    if (daHorse_c* horse = dComIfGp_getHorseActor()) {
+                        horse->lerpControlPoints(dusk::frame_interp::get_interpolation_step());
+                    }
+                }
+#endif
+            };
+
+            auto draw_world_3d_section = [&]() {
             dKy_setLight();
 #if TARGET_PC
             if (dusk::getSettings().game.enableFrameInterpolation) {
@@ -2272,10 +2303,6 @@ int mDoGph_Painter() {
 
 #if TARGET_PC
             if (dusk::getSettings().game.enableFrameInterpolation) {
-                // FRAME INTERP NOTE: Currently only recalculating points for Epona's reins. Need a more global solution.
-                if (daHorse_c* horse = dComIfGp_getHorseActor()) {
-                    horse->lerpControlPoints(dusk::frame_interp::get_interpolation_step());
-                }
                 g_dComIfG_gameInfo.drawlist.refresh3DlineMats(camera_p->view.lookat.eye);
             }
 #endif
@@ -2330,7 +2357,28 @@ int mDoGph_Painter() {
                 dJprev_c::get()->show3D(camera_p->view.viewMtx);
             }
 #endif
+            };
 
+            auto draw_world_projected_2d_section = [&]() {
+#if TARGET_PC
+                const auto& queue = dusk::vr::world_projected_queue();
+                if (queue.empty()) {
+                    return;
+                }
+
+                Mtx savedViewMtx;
+                cMtx_copy(j3dSys.getViewMtx(), savedViewMtx);
+                ortho.setPort();
+                for (const dusk::vr::WorldProjectedItem& item : queue) {
+                    if (item.drawList != nullptr) {
+                        item.drawList->draw();
+                    }
+                }
+                j3dSys.setViewMtx(savedViewMtx);
+#endif
+            };
+
+            auto draw_mono_screen_space_post_effects_section = [&]() {
             if (!dComIfGp_isPauseFlag()) {
                 #if DEBUG
                 fapGm_HIO_c::startCpuTimer();
@@ -2573,6 +2621,44 @@ int mDoGph_Painter() {
                 fapGm_HIO_c::stopCpuTimer("カラーフェード描画（レンダリング）");
                 #endif
             }
+            };
+
+#if TARGET_PC
+            bool drewXrEye = false;
+            if (dusk::vr::should_render() && dusk::vr::eye_count() != 0) {
+                prepare_world_3d_once_section();
+                for (uint32_t eyeIndex = 0; eyeIndex < dusk::vr::eye_count(); ++eyeIndex) {
+                    if (!aurora_xr_begin_eye(eyeIndex)) {
+                        continue;
+                    }
+
+                    dusk::vr::EyeViewToken eyeToken;
+                    if (dusk::vr::begin_eye_view(camera_p->view, eyeIndex, eyeToken)) {
+                        draw_info = make_draw_info_section();
+                        apply_active_camera_section();
+                        draw_world_3d_section();
+                        draw_world_projected_2d_section();
+                        drewXrEye = true;
+                    }
+                    dusk::vr::end_eye_view(eyeToken);
+                    aurora_xr_end_eye();
+                }
+
+                draw_info = make_draw_info_section();
+                apply_active_camera_section();
+                renderedXrStereoWorld = drewXrEye;
+            }
+
+            if (!drewXrEye) {
+                prepare_world_3d_once_section();
+                draw_world_3d_section();
+                draw_mono_screen_space_post_effects_section();
+            }
+#else
+            prepare_world_3d_once_section();
+            draw_world_3d_section();
+            draw_mono_screen_space_post_effects_section();
+#endif
         }
     }
 
@@ -2581,7 +2667,7 @@ int mDoGph_Painter() {
     #endif
 
     #if TARGET_PC
-    if (dusk::getSettings().game.enableMirrorMode)
+    if (!renderedXrStereoWorld && dusk::getSettings().game.enableMirrorMode)
     #elif PLATFORM_WII
     if (data_8053a730)
     #endif
@@ -2673,6 +2759,15 @@ int mDoGph_Painter() {
 
         GX_DEBUG_GROUP(dComIfGd_draw2DOpaTop);
         GX_DEBUG_GROUP(dComIfGd_draw2DXlu);
+#if TARGET_PC
+        if (!renderedXrStereoWorld) {
+            for (const dusk::vr::WorldProjectedItem& item : dusk::vr::world_projected_queue()) {
+                if (item.drawList != nullptr) {
+                    item.drawList->draw();
+                }
+            }
+        }
+#endif
 
         if (dComIfGp_isPauseFlag()) {
             GX_DEBUG_GROUP(dComIfGp_particle_draw2Dfore, &draw_info3);
@@ -2702,6 +2797,15 @@ int mDoGph_Painter() {
         dComIfGd_draw2DOpa();
         dComIfGd_draw2DOpaTop();
         dComIfGd_draw2DXlu();
+#if TARGET_PC
+        if (!renderedXrStereoWorld) {
+            for (const dusk::vr::WorldProjectedItem& item : dusk::vr::world_projected_queue()) {
+                if (item.drawList != nullptr) {
+                    item.drawList->draw();
+                }
+            }
+        }
+#endif
     }
 
     #if DEBUG

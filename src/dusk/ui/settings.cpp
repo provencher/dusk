@@ -53,6 +53,12 @@ constexpr std::array kGyroInputModeLabels = {
     "Mouse",
 };
 
+constexpr std::array kXrModeLabels = {
+    "Off",
+    "Enabled",
+    "Required",
+};
+
 bool try_parse_backend(std::string_view backend, AuroraBackend& outBackend) {
     if (backend == "auto") {
         outBackend = BACKEND_AUTO;
@@ -161,6 +167,56 @@ AuroraBackend configured_backend() {
         configuredBackend = BACKEND_AUTO;
     }
     return configuredBackend;
+}
+
+std::string_view xr_mode_name(XrMode mode) {
+    return kXrModeLabels[static_cast<size_t>(mode)];
+}
+
+void add_xr_mode_control(Pane& leftPane, Pane& rightPane, bool prelaunch) {
+    leftPane.register_control(
+        leftPane.add_select_button({
+            .key = "OpenXR Mode",
+            .getValue =
+                [] {
+                    return Rml::String{xr_mode_name(getSettings().backend.xrMode.getValue())};
+                },
+            .isModified =
+                [prelaunch] {
+                    if (prelaunch) {
+                        return getSettings().backend.xrMode.getValue() !=
+                               prelaunch_state().initialXrMode;
+                    }
+                    return getSettings().backend.xrMode.getValue() !=
+                           getSettings().backend.xrMode.getDefaultValue();
+                },
+        }),
+        rightPane, [](Pane& pane) {
+            for (size_t i = 0; i < kXrModeLabels.size(); i++) {
+                pane
+                    .add_button({
+                        .text = Rml::String{kXrModeLabels[i]},
+                        .isSelected =
+                            [i] {
+                                return getSettings().backend.xrMode.getValue() ==
+                                       static_cast<XrMode>(i);
+                            },
+                    })
+                    .on_pressed([i] {
+                        mDoAud_seStartMenu(kSoundItemChange);
+                        getSettings().backend.xrMode.setValue(static_cast<XrMode>(i));
+                        config::Save();
+                    });
+            }
+            pane.add_rml(
+                "<br/>Experimental OpenXR startup mode. When enabled, Dusk validates Vulkan "
+                "availability and asks Aurora to launch XR through the Vulkan backend; no "
+                "separate OpenXR graphics backend is added.<br/><br/>"
+                "<b>Enabled</b> falls back to normal flat startup if Vulkan or OpenXR cannot "
+                "become active. <b>Required</b> fails startup instead.<br/><br/>"
+                "Changes require a restart. Current XR rendering remains limited until Aurora "
+                "has native Vulkan/OpenXR swapchain interop.");
+        });
 }
 
 void reset_for_speedrun_mode() {
@@ -419,6 +475,7 @@ SettingsWindow::SettingsWindow(bool prelaunch) : mPrelaunch(prelaunch) {
                     }
                     pane.add_rml("<br/>Changes require a restart.");
                 });
+            add_xr_mode_control(leftPane, rightPane, true);
             leftPane.register_control(
                 leftPane.add_select_button({
                     .key = "Save File Type",
@@ -602,6 +659,9 @@ SettingsWindow::SettingsWindow(bool prelaunch) : mPrelaunch(prelaunch) {
             {
                 .key = "Enable Mini-Map Shadows",
             });
+
+        leftPane.add_section("OpenXR");
+        add_xr_mode_control(leftPane, rightPane, mPrelaunch);
     });
 
     add_tab("Input", [this](Rml::Element* content) {

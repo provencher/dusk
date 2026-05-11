@@ -32,6 +32,12 @@ enum class GyroMode : u8 {
     Mouse = 1,
 };
 
+enum class XrMode : u8 {
+    Disabled = 0,
+    Optional = 1,
+    Required = 2,
+};
+
 namespace config {
 template <>
 struct ConfigEnumRange<BloomMode> {
@@ -55,6 +61,12 @@ template <>
 struct ConfigEnumRange<GyroMode> {
     static constexpr auto min = GyroMode::Sensor;
     static constexpr auto max = GyroMode::Mouse;
+};
+
+template <>
+struct ConfigEnumRange<XrMode> {
+    static constexpr auto min = XrMode::Disabled;
+    static constexpr auto max = XrMode::Required;
 };
 }
 
@@ -183,6 +195,7 @@ struct UserSettings {
         ConfigVar<std::string> isoPath;
         ConfigVar<DiscVerificationState> isoVerification;
         ConfigVar<std::string> graphicsBackend;
+        ConfigVar<XrMode> xrMode;
         ConfigVar<bool> skipPreLaunchUI;
         ConfigVar<bool> showPipelineCompilation;
         ConfigVar<bool> wasPresetChosen;

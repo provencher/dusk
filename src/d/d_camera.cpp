@@ -31,6 +31,7 @@
 #if TARGET_PC
 #include "dusk/frame_interpolation.h"
 #include "dusk/logging.h"
+#include "dusk/vr/vr.hpp"
 #include "imgui.h"
 #endif
 
@@ -11102,7 +11103,13 @@ static void view_setup(camera_process_class* i_this) {
         far_ = var_f30;
     }
 
-    mDoLib_clipper::setup(view->fovy, view->aspect, view->near_, far_);
+    f32 cullFovy = view->fovy;
+#if TARGET_PC
+    if (dusk::vr::active() && cullFovy < 120.0f) {
+        cullFovy = 120.0f;
+    }
+#endif
+    mDoLib_clipper::setup(cullFovy, view->aspect, view->near_, far_);
 }
 
 static void store(camera_process_class* i_camera) {
