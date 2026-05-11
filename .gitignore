@@ -43,6 +43,7 @@ compile_commands.json
 
 # ISOs
 *.iso
+*.ciso
 
 *.ini
 *.controller
