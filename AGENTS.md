@@ -3,6 +3,11 @@
 This repo is Dusk, a reverse-engineered reimplementation of Twilight Princess.
 Do not add or commit copyrighted game dumps or extracted proprietary assets.
 
+## Local Setup
+
+This workspace is used on both Windows and macOS. Keep platform-specific local
+launchers and disc images untracked.
+
 ## Local Windows Setup
 
 This workspace has been set up and built on Windows using Visual Studio 2026
@@ -82,11 +87,64 @@ Equivalent direct command:
 If no disc argument is supplied, Dusk defaults to `game.iso` in the current
 working directory, so pass `game.ciso` explicitly or use `run-dusk.bat`.
 
+## Local macOS Setup
+
+Important local paths:
+
+- Repo: `/Users/pvncher/Documents/Git/dusk`
+- 7-Zip archive with the user's legal dump: `/Users/pvncher/Library/CloudStorage/GoogleDrive-eprovencher92@gmail.com/My Drive/Games/Roms/GC/Legend of Zelda, The - Twilight Princess (USA) NGC.7z`
+- Local disc image after extraction: `/Users/pvncher/Documents/Git/dusk/game.ciso`
+- Built app bundle: `/Users/pvncher/Documents/Git/dusk/build/macos-default-relwithdebinfo/Dusk.app`
+- App binary: `/Users/pvncher/Documents/Git/dusk/build/macos-default-relwithdebinfo/Dusk.app/Contents/MacOS/Dusk`
+- Local launcher: `/Users/pvncher/Documents/Git/dusk/run-dusk.sh`
+
+Install local build prerequisites with Homebrew if needed:
+
+```sh
+brew install cmake ninja p7zip
+```
+
+Extract the local disc image from the user's legal archive with:
+
+```sh
+7z e "/Users/pvncher/Library/CloudStorage/GoogleDrive-eprovencher92@gmail.com/My Drive/Games/Roms/GC/Legend of Zelda, The - Twilight Princess (USA) NGC.7z" \
+  "Legend of Zelda, The - Twilight Princess (USA).ciso" -o"/Users/pvncher/Documents/Git/dusk" -y
+mv "/Users/pvncher/Documents/Git/dusk/Legend of Zelda, The - Twilight Princess (USA).ciso" \
+  "/Users/pvncher/Documents/Git/dusk/game.ciso"
+```
+
+Configure and build on macOS with:
+
+```sh
+cmake --preset macos-default-relwithdebinfo
+cmake --build --preset macos-default-relwithdebinfo
+```
+
+A successful macOS build produces:
+
+```text
+build/macos-default-relwithdebinfo/Dusk.app
+```
+
+Run on macOS with:
+
+```sh
+./run-dusk.sh
+```
+
+Equivalent direct command:
+
+```sh
+./build/macos-default-relwithdebinfo/Dusk.app/Contents/MacOS/Dusk ./game.ciso
+```
+
 ## Current Local State
 
-Expected untracked local setup files:
+Expected local setup files:
 
-- `game.ciso`
+- `game.ciso` (untracked; ignored by `*.ciso`)
 - `run-dusk.bat`
+- `run-dusk.sh`
 
-Do not remove these unless the user asks. Do not commit `game.ciso`.
+Do not remove these unless the user asks. Do not commit copyrighted disc images
+or extracted proprietary assets.
