@@ -607,6 +607,33 @@ if (AURORA_ENABLE_OPENXR AND NOT ANDROID AND NOT IOS AND NOT TVOS)
                 set_tests_properties(dusk_openxr_probe_live_clear PROPERTIES
                     ENVIRONMENT_MODIFICATION "${_dusk_openxr_live_environment_modification}")
             endif ()
+            add_test(NAME dusk_openxr_probe_mock_hmd_motion
+                COMMAND dusk_openxr_probe
+                    --require-dawn-interop
+                    --exercise-head-motion
+                    --head-motion-image-dir "${CMAKE_CURRENT_BINARY_DIR}/openxr-head-motion-images")
+            set_tests_properties(dusk_openxr_probe_mock_hmd_motion PROPERTIES
+                LABELS "openxr;openxr-live;openxr-mock-hmd"
+                PASS_REGULAR_EXPRESSION "xr_head_motion_gate=validated"
+                FAIL_REGULAR_EXPRESSION "xr_proof_gate=no_hmd|xr_status=unavailable|xr_dawn_interop=missing|xr_head_motion_gate=proof_not_cleared|xr_head_motion_gate=no_initial_pose|xr_head_motion_gate=no_later_pose|xr_head_motion_gate=no_lateral_motion|xr_head_motion_gate=no_rotational_motion|xr_head_motion_gate=image_static|xr_head_motion_gate=no_stereo_separation")
+            set(_dusk_openxr_mock_environment
+                "SIMULATED_ENABLE=TRUE"
+                "SIMULATED_ROTATE=FALSE"
+                "XRT_COMPOSITOR_NULL=TRUE"
+                "XRT_DEBUG_GUI=FALSE"
+                "OXR_DEBUG_GUI=FALSE")
+            if (DUSK_OPENXR_TEST_RUNTIME_JSON)
+                list(APPEND _dusk_openxr_mock_environment "XR_RUNTIME_JSON=${DUSK_OPENXR_TEST_RUNTIME_JSON}")
+            endif ()
+            if (DUSK_OPENXR_TEST_ENVIRONMENT)
+                list(APPEND _dusk_openxr_mock_environment ${DUSK_OPENXR_TEST_ENVIRONMENT})
+            endif ()
+            set_tests_properties(dusk_openxr_probe_mock_hmd_motion PROPERTIES
+                ENVIRONMENT "${_dusk_openxr_mock_environment}")
+            if (DUSK_OPENXR_TEST_PATH_DIRS)
+                set_tests_properties(dusk_openxr_probe_mock_hmd_motion PROPERTIES
+                    ENVIRONMENT_MODIFICATION "${_dusk_openxr_live_environment_modification}")
+            endif ()
         endif ()
     else ()
         add_test(NAME dusk_openxr_probe_dawn_interop_missing COMMAND dusk_openxr_probe --allow-unavailable)
