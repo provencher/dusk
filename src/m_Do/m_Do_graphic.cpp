@@ -2733,7 +2733,12 @@ int mDoGph_Painter() {
     captureScreenSetPort();
     #endif
 
-    if (fapGmHIO_get2Ddraw()) {
+#if TARGET_PC
+    const bool drawFlat2D = !renderedXrStereoWorld && fapGmHIO_get2Ddraw();
+#else
+    const bool drawFlat2D = fapGmHIO_get2Ddraw();
+#endif
+    if (drawFlat2D) {
         Mtx m4;
         cMtx_copy(j3dSys.getViewMtx(), m4);
 
@@ -2785,7 +2790,13 @@ int mDoGph_Painter() {
 
         GX_DEBUG_GROUP(dComIfGp_particle_draw2DmenuFore, &draw_info3);
         j3dSys.setViewMtx(m4);
-    } else {
+    }
+#if TARGET_PC
+    else if (!renderedXrStereoWorld)
+#else
+    else
+#endif
+    {
         // No camera window active — still draw 2D display lists
         // (needed for logo scene, which has no 3D camera)
         static int sElseLogCount = 0;
@@ -2807,6 +2818,13 @@ int mDoGph_Painter() {
         }
 #endif
     }
+
+#if TARGET_PC
+    else if (strcmp(dComIfGp_getStartStageName(), "F_SP127") == 0 || (mDoGph_gInf_c::isFade() & 0x80) != 0)
+    {
+        mDoGph_gInf_c::calcFade();
+    }
+#endif
 
     #if DEBUG
     if (dJcame_c::get()) {
