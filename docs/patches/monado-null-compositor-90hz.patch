@@ -1,0 +1,25 @@
+diff --git a/src/xrt/compositor/null/null_compositor.c b/src/xrt/compositor/null/null_compositor.c
+index 9e9b5dd78..40a64b6e9 100644
+--- a/src/xrt/compositor/null/null_compositor.c
++++ b/src/xrt/compositor/null/null_compositor.c
+@@ -35,6 +35,7 @@ static const uint64_t MAX_VIEW_WIDTH = 1920;
+ static const uint64_t MAX_VIEW_HEIGHT = 1080;
+ 
+ DEBUG_GET_ONCE_LOG_OPTION(log, "XRT_COMPOSITOR_LOG", U_LOGGING_INFO)
++DEBUG_GET_ONCE_FLOAT_OPTION(null_refresh_rate_hz, "XRT_COMPOSITOR_NULL_REFRESH_RATE_HZ", 90.0f)
+ 
+ 
+ /*
+@@ -608,7 +609,11 @@ null_compositor_create_system(struct xrt_device *xdev, struct xrt_system_composi
+ 	c->settings.log_level = debug_get_log_option_log();
+ 	c->frame.waited.id = -1;
+ 	c->frame.rendering.id = -1;
+-	c->settings.frame_interval_ns = U_TIME_1S_IN_NS / 20; // 20 FPS
++	float refresh_rate_hz = debug_get_float_option_null_refresh_rate_hz();
++	if (refresh_rate_hz <= 0.0f) {
++		refresh_rate_hz = 90.0f;
++	}
++	c->settings.frame_interval_ns = (int64_t)((double)U_TIME_1S_IN_NS / (double)refresh_rate_hz);
+ 	c->xdev = xdev;
+ 
+ 	NULL_DEBUG(c, "Doing init %p", (void *)c);

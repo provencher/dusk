@@ -82,11 +82,12 @@ The probe status message includes a `Dawn interop:` diagnostic and a structured 
 
 When a headset/runtime is available, configure the patched vendor build with `-DDUSK_OPENXR_ENABLE_LIVE_TESTS=ON` to register `dusk_openxr_probe_live_clear`. That live test runs without `--allow-unavailable`, requires `xr_dawn_interop=ready`, and passes only when the Dawn/OpenXR proof reaches `xr_proof_gate=cleared` and the harness drives `aurora_xr_begin_eye()` far enough to report `xr_eye_target_gate=submitted`.
 
-For no-headset development, the preferred mock runtime is Monado's simulated HMD on Windows. Build an in-process Monado runtime with the simulated driver and use the null compositor for headless proof runs. The current tested Monado snapshot also needs `docs/patches/monado-openxr-enable2-app-owned-vkinstance.patch` when using Dawn's app-owned `VkInstance` with `XR_KHR_vulkan_enable2`:
+For no-headset development, the preferred mock runtime is Monado's simulated HMD on Windows. Build an in-process Monado runtime with the simulated driver and use the null compositor for headless proof runs. The current tested Monado snapshot also needs `docs/patches/monado-openxr-enable2-app-owned-vkinstance.patch` when using Dawn's app-owned `VkInstance` with `XR_KHR_vulkan_enable2`. Apply `docs/patches/monado-null-compositor-90hz.patch` as well so the null compositor advertises a 90 Hz frame interval instead of Monado's default 20 Hz CI pacing:
 
 ```powershell
 git clone --depth 1 https://gitlab.freedesktop.org/monado/monado.git build\monado-src
 git -C build\monado-src apply ..\..\docs\patches\monado-openxr-enable2-app-owned-vkinstance.patch
+git -C build\monado-src apply ..\..\docs\patches\monado-null-compositor-90hz.patch
 
 cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cmake -S build\monado-src -B build\monado-inprocess -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_TOOLCHAIN_FILE=""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\vcpkg\scripts\buildsystems\vcpkg.cmake"" -DXRT_FEATURE_SERVICE=OFF -DXRT_BUILD_DRIVER_SIMULATED=ON"
 cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cmake --build build\monado-inprocess --target openxr_monado --config RelWithDebInfo"
@@ -94,13 +95,14 @@ cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\
 $env:XR_RUNTIME_JSON = "$PWD\build\monado-inprocess\openxr_monado-dev.json"
 $env:SIMULATED_ENABLE = "TRUE"
 $env:XRT_COMPOSITOR_NULL = "TRUE"
+$env:XRT_COMPOSITOR_NULL_REFRESH_RATE_HZ = "90"
 $env:XRT_DEBUG_GUI = "FALSE"
 $env:OXR_DEBUG_GUI = "FALSE"
 $env:PATH = "$PWD\build\monado-inprocess\src\xrt\targets\openxr;$PWD\build\monado-inprocess\vcpkg_installed\x64-windows\bin;$env:PATH"
 .\build\windows-msvc-dawn-vendor-openxr\dusk_openxr_probe.exe --require-dawn-interop
 ```
 
-The same runtime manifest can be wired into CTest by configuring the patched Dawn build with `-DDUSK_OPENXR_ENABLE_LIVE_TESTS=ON`, `-DDUSK_OPENXR_TEST_RUNTIME_JSON=C:/path/to/monado-inprocess/openxr_monado-dev.json`, `-DDUSK_OPENXR_TEST_ENVIRONMENT=SIMULATED_ENABLE=TRUE;XRT_COMPOSITOR_NULL=TRUE;XRT_DEBUG_GUI=FALSE;OXR_DEBUG_GUI=FALSE`, and `-DDUSK_OPENXR_TEST_PATH_DIRS=C:/path/to/monado-inprocess/src/xrt/targets/openxr;C:/path/to/monado-inprocess/vcpkg_installed/x64-windows/bin`. Then run `ctest -R dusk_openxr_probe_live_clear --output-on-failure`; a passing test prints `xr_live_gate=cleared_submitted` after creating an OpenXR session with Dawn's Vulkan device, clearing both mock eye swapchain images, and driving a frame through `aurora_xr_begin_eye()`/`aurora_xr_end_eye()`. With Monado's null compositor enabled, Aurora suppresses projection-layer submission after releasing the acquired images because that mock compositor is used for CI-style target lifetime testing rather than display. SteamVR's null driver can also advertise a fake headset, but Monado is a better fit for this gate because it is a native OpenXR runtime with a simulated HMD driver and a generated `XR_RUNTIME_JSON` manifest.
+The same runtime manifest can be wired into CTest by configuring the patched Dawn build with `-DDUSK_OPENXR_ENABLE_LIVE_TESTS=ON`, `-DDUSK_OPENXR_TEST_RUNTIME_JSON=C:/path/to/monado-inprocess/openxr_monado-dev.json`, `-DDUSK_OPENXR_TEST_ENVIRONMENT=SIMULATED_ENABLE=TRUE;XRT_COMPOSITOR_NULL=TRUE;XRT_COMPOSITOR_NULL_REFRESH_RATE_HZ=90;XRT_DEBUG_GUI=FALSE;OXR_DEBUG_GUI=FALSE`, and `-DDUSK_OPENXR_TEST_PATH_DIRS=C:/path/to/monado-inprocess/src/xrt/targets/openxr;C:/path/to/monado-inprocess/vcpkg_installed/x64-windows/bin`. Then run `ctest -R dusk_openxr_probe_live_clear --output-on-failure`; a passing test prints `xr_live_gate=cleared_submitted` after creating an OpenXR session with Dawn's Vulkan device, clearing both mock eye swapchain images, and driving a frame through `aurora_xr_begin_eye()`/`aurora_xr_end_eye()`. `ctest -R dusk_openxr_probe_mock_hmd_motion --output-on-failure` validates simulated-HMD 6DoF motion and writes first/last/delta SBS images under the build tree. With Monado's null compositor enabled, Aurora suppresses projection-layer submission after releasing the acquired images because that mock compositor is used for CI-style target lifetime testing rather than display. SteamVR's null driver can also advertise a fake headset, but Monado is a better fit for this gate because it is a native OpenXR runtime with a simulated HMD driver and a generated `XR_RUNTIME_JSON` manifest.
 
 If no OpenXR loader target is found, Aurora still builds the XR API stubs and Dusk can run normally, but XR requests will report unavailable.
 
