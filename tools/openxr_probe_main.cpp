@@ -1,5 +1,6 @@
 #include <aurora/aurora.h>
 
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -7,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -84,11 +86,52 @@ const char* dawn_interop_status(const char* message) {
   }
   return "unknown";
 }
+
+const char* exercise_eye_targets(uint32_t viewCount) {
+  if (viewCount == 0) {
+    return "no_views";
+  }
+
+  constexpr uint32_t MaxFrames = 240;
+  for (uint32_t frame = 0; frame < MaxFrames; ++frame) {
+    aurora_update();
+    if (!aurora_begin_frame()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(4));
+      continue;
+    }
+
+    uint32_t renderedEyes = 0;
+    if (aurora_xr_should_render()) {
+      for (uint32_t eyeIndex = 0; eyeIndex < viewCount; ++eyeIndex) {
+        if (aurora_xr_begin_eye(eyeIndex)) {
+          ++renderedEyes;
+          aurora_xr_end_eye();
+        }
+      }
+    }
+    aurora_end_frame();
+
+    if (renderedEyes == viewCount) {
+      return "submitted";
+    }
+    if (renderedEyes != 0) {
+      return "partial";
+    }
+    if (aurora_xr_get_status() == AURORA_XR_LOST) {
+      return "lost";
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(4));
+  }
+
+  return aurora_xr_is_active() ? "no_eye" : "no_active_frame";
+}
 } // namespace
 
 int main(int argc, char* argv[]) {
   bool allowUnavailable = false;
   bool requireDawnInterop = false;
+  bool exerciseEyes = false;
   std::vector<char*> auroraArgv;
   auroraArgv.reserve(static_cast<size_t>(argc));
   auroraArgv.push_back(argv[0]);
@@ -97,6 +140,8 @@ int main(int argc, char* argv[]) {
       allowUnavailable = true;
     } else if (argv[i] != nullptr && std::string_view{argv[i]} == "--require-dawn-interop") {
       requireDawnInterop = true;
+    } else if (argv[i] != nullptr && std::string_view{argv[i]} == "--exercise-eye-targets") {
+      exerciseEyes = true;
     } else {
       auroraArgv.push_back(argv[i]);
     }
@@ -141,9 +186,17 @@ int main(int argc, char* argv[]) {
                   view.recommendedSampleCount);
     }
   }
+  const char* eyeTargetGate = "not_requested";
+  if (exerciseEyes) {
+    std::fflush(stdout);
+    eyeTargetGate = proofSucceeded ? exercise_eye_targets(viewCount) : "proof_not_cleared";
+    std::printf("xr_eye_target_gate=%s\n", eyeTargetGate);
+    std::printf("xr_live_gate=%s_%s\n", proof_gate_status(status, message), eyeTargetGate);
+  }
 
   const bool smokeSatisfied = allowUnavailable && is_unavailable_or_blocked(status);
   const bool dawnInteropSatisfied = !requireDawnInterop || std::string_view{dawnInterop} == "ready";
+  const bool eyeTargetsSatisfied = !exerciseEyes || std::string_view{eyeTargetGate} == "submitted";
   aurora_shutdown();
-  return dawnInteropSatisfied && (proofSucceeded || smokeSatisfied) ? 0 : 2;
+  return dawnInteropSatisfied && eyeTargetsSatisfied && (proofSucceeded || smokeSatisfied) ? 0 : 2;
 }

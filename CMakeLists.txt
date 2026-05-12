@@ -582,11 +582,11 @@ if (AURORA_ENABLE_OPENXR AND NOT ANDROID AND NOT IOS AND NOT TVOS)
             PASS_REGULAR_EXPRESSION "xr_dawn_interop=ready"
             FAIL_REGULAR_EXPRESSION "current Dawn package does not expose|patched Dawn returned incomplete")
         if (DUSK_OPENXR_ENABLE_LIVE_TESTS)
-            add_test(NAME dusk_openxr_probe_live_clear COMMAND dusk_openxr_probe --require-dawn-interop)
+            add_test(NAME dusk_openxr_probe_live_clear COMMAND dusk_openxr_probe --require-dawn-interop --exercise-eye-targets)
             set_tests_properties(dusk_openxr_probe_live_clear PROPERTIES
                 LABELS "openxr;openxr-live"
-                PASS_REGULAR_EXPRESSION "xr_proof_gate=cleared"
-                FAIL_REGULAR_EXPRESSION "xr_proof_gate=no_hmd|xr_status=unavailable|xr_dawn_interop=missing")
+                PASS_REGULAR_EXPRESSION "xr_live_gate=cleared_submitted"
+                FAIL_REGULAR_EXPRESSION "xr_proof_gate=no_hmd|xr_status=unavailable|xr_dawn_interop=missing|xr_eye_target_gate=proof_not_cleared|xr_eye_target_gate=no_active_frame|xr_eye_target_gate=no_eye|xr_eye_target_gate=partial|xr_eye_target_gate=lost")
             set(_dusk_openxr_live_environment)
             if (DUSK_OPENXR_TEST_RUNTIME_JSON)
                 list(APPEND _dusk_openxr_live_environment "XR_RUNTIME_JSON=${DUSK_OPENXR_TEST_RUNTIME_JSON}")
