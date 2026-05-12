@@ -121,6 +121,8 @@ UserSettings g_userSettings = {
         .isoVerification {"backend.isoVerification", DiscVerificationState::Unknown},
         .graphicsBackend {"backend.graphicsBackend", "auto"},
         .xrMode {"backend.xrMode", XrMode::Disabled},
+        .xrEyeWidth {"backend.xrEyeWidth", 3000},
+        .xrEyeHeight {"backend.xrEyeHeight", 3000},
         .skipPreLaunchUI {"backend.skipPreLaunchUI", false},
         .showPipelineCompilation {"backend.showPipelineCompilation", false},
         .wasPresetChosen {"backend.wasPresetChosen", false},
@@ -230,6 +232,8 @@ void registerSettings() {
     Register(g_userSettings.backend.isoVerification);
     Register(g_userSettings.backend.graphicsBackend);
     Register(g_userSettings.backend.xrMode);
+    Register(g_userSettings.backend.xrEyeWidth);
+    Register(g_userSettings.backend.xrEyeHeight);
     Register(g_userSettings.backend.skipPreLaunchUI);
     Register(g_userSettings.backend.showPipelineCompilation);
     Register(g_userSettings.backend.wasPresetChosen);

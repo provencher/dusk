@@ -196,6 +196,8 @@ struct UserSettings {
         ConfigVar<DiscVerificationState> isoVerification;
         ConfigVar<std::string> graphicsBackend;
         ConfigVar<XrMode> xrMode;
+        ConfigVar<int> xrEyeWidth;
+        ConfigVar<int> xrEyeHeight;
         ConfigVar<bool> skipPreLaunchUI;
         ConfigVar<bool> showPipelineCompilation;
         ConfigVar<bool> wasPresetChosen;

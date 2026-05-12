@@ -6,6 +6,7 @@
 
 #include "m_Do/m_Do_main.h"
 #include <dolphin/vi.h>
+#include <algorithm>
 #include <cstring>
 #include "DynamicLink.h"
 #include "JSystem/JAudio2/JASAudioThread.h"
@@ -762,6 +763,8 @@ int game_main(int argc, char* argv[]) {
         config.desiredBackend = startupXrPolicy.desiredBackend;
         config.enableOpenXR = startupXrPolicy.enableOpenXR;
         config.requireOpenXR = startupXrPolicy.requireOpenXR;
+        config.openXREyeWidth = static_cast<uint32_t>(std::max(0, dusk::getSettings().backend.xrEyeWidth.getValue()));
+        config.openXREyeHeight = static_cast<uint32_t>(std::max(0, dusk::getSettings().backend.xrEyeHeight.getValue()));
         config.logCallback = &aurora_log_callback;
         config.logLevel = startupLogLevel;
         config.mem1Size = 256 * 1024 * 1024;
