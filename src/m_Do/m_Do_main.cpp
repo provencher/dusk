@@ -435,6 +435,10 @@ static StartupXrPolicy ResolveStartupXrPolicy(AuroraBackend desiredBackend) {
     return policy;
 }
 
+static bool IsStartupXrStatusSatisfied(AuroraXRStatus status) {
+    return status == AURORA_XR_READY || status == AURORA_XR_ACTIVE;
+}
+
 static void aurora_imgui_init_callback(const AuroraWindowSize* size) {
     dusk::ImGuiEngine_Initialize(size->scale);
     dusk::ImGuiEngine_AddTextures();
@@ -769,13 +773,16 @@ int game_main(int argc, char* argv[]) {
         config.allowTextureDumps = false;
         auroraInfo = aurora_initialize(argc, argv, &config);
         if (startupXrPolicy.enableOpenXR) {
-            if (aurora_xr_is_active()) {
-                DuskLog.info("OpenXR active: {}", aurora_xr_get_status_message());
+            const AuroraXRStatus xrStatus = aurora_xr_get_status();
+            if (IsStartupXrStatusSatisfied(xrStatus)) {
+                DuskLog.info("OpenXR {}: {}",
+                             xrStatus == AURORA_XR_ACTIVE ? "active" : "ready",
+                             aurora_xr_get_status_message());
             } else if (startupXrPolicy.requireOpenXR) {
-                DuskLog.fatal("OpenXR is Required, but it did not become active: {}",
+                DuskLog.fatal("OpenXR is Required, but it did not initialize: {}",
                               aurora_xr_get_status_message());
             } else {
-                DuskLog.warn("OpenXR requested but not active ({}); continuing flat startup",
+                DuskLog.warn("OpenXR requested but unavailable ({}); continuing flat startup",
                              aurora_xr_get_status_message());
             }
         }

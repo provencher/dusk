@@ -213,9 +213,9 @@ void add_xr_mode_control(Pane& leftPane, Pane& rightPane, bool prelaunch) {
                 "availability and asks Aurora to launch XR through the Vulkan backend; no "
                 "separate OpenXR graphics backend is added.<br/><br/>"
                 "<b>Enabled</b> falls back to normal flat startup if Vulkan or OpenXR cannot "
-                "become active. <b>Required</b> fails startup instead.<br/><br/>"
+                "initialize to ready or active. <b>Required</b> fails startup instead.<br/><br/>"
                 "Changes require a restart. Current XR rendering remains limited until Aurora "
-                "has native Vulkan/OpenXR swapchain interop.");
+                "has native Vulkan/OpenXR swapchain image interop.");
         });
 }
 

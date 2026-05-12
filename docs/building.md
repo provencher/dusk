@@ -44,11 +44,63 @@ To build Aurora's OpenXR runtime probe, install an OpenXR loader/development pac
 * **Linux**: install a Vulkan-capable OpenXR runtime such as Monado or SteamVR, plus loader/development files. Distribution package names vary; look for OpenXR loader/headers packages in addition to the Vulkan packages above.
 * **macOS**: Vulkan/OpenXR launch is not currently an expected runtime target. Builds may still compile the XR stubs, but active desktop XR rendering is blocked.
 
+On Windows, a local Khronos OpenXR SDK build can be installed under `build/` and passed to Dusk's configure step:
+
+```bat
+git clone --depth 1 --branch release-1.1.59 https://github.com/KhronosGroup/OpenXR-SDK.git build\openxr-sdk-src
+
+cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cmake -G Ninja -S build\openxr-sdk-src -B build\openxr-sdk-build-dll -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=build\openxr-sdk-install-dll -DBUILD_TESTS=OFF -DBUILD_API_LAYERS=OFF -DBUILD_CONFORMANCE_TESTS=OFF -DBUILD_CONFORMANCE_CLI=OFF -DDYNAMIC_LOADER=ON && cmake --build build\openxr-sdk-build-dll --target install"
+
+cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cmake --preset windows-msvc-relwithdebinfo -DAURORA_ENABLE_OPENXR=ON -DOpenXR_DIR=build/openxr-sdk-install-dll/cmake"
+```
+
+Use `DYNAMIC_LOADER=ON` for this local SDK build. The SDK's static-loader target uses the dynamic MSVC runtime on Windows, while this Dusk preset currently links the static runtime; mixing them fails with MSVC runtime-library link errors. The dynamic loader build installs `openxr_loader.dll`, and Dusk's existing runtime-DLL copy step places it next to `dusk.exe`.
+
 Configure with the normal preset plus:
 
 ```sh
 cmake --preset <preset> -DAURORA_ENABLE_OPENXR=ON
 ```
+
+If an OpenXR package is not installed, Aurora can fetch the Khronos SDK during configure:
+
+```sh
+cmake --preset <preset> -DAURORA_ENABLE_OPENXR=ON -DAURORA_FETCH_OPENXR_SDK=ON
+```
+
+Aurora currently builds against OpenXR SDK `release-1.1.59` but requests OpenXR API `1.0.0` when creating the runtime instance. This keeps newer headers available at build time while remaining compatible with runtimes that reject a 1.1 application request.
+
+The Dawn-first OpenXR proof needs a source-built Dawn because the current prebuilt Dawn package does not export the Vulkan device, physical device, or queue handles. For that experiment, configure with the vendored static Dawn provider and apply Dusk's Dawn handle patch:
+
+```sh
+cmake --preset <preset> -DAURORA_ENABLE_OPENXR=ON -DAURORA_FETCH_OPENXR_SDK=ON -DAURORA_DAWN_PROVIDER=vendor -DAURORA_DAWN_LINKAGE=static -DAURORA_DAWN_APPLY_OPENXR_PATCH=ON
+```
+
+That configuration also builds `dusk_openxr_probe`, a small standalone OpenXR/Dawn harness. It initializes Aurora with the Vulkan backend, runs the OpenXR runtime and patched-Dawn swapchain clear proof, prints the XR status/views, then exits without loading a game disc. A healthy patched-Dawn proof exits `0`; unavailable or blocked XR exits `2`. For build/test smoke on machines without a headset, run `cmd.exe /c build\windows-msvc-relwithdebinfo\dusk_openxr_probe.exe --allow-unavailable`; that mode still prints the XR gate as `xr_proof_gate=...` but exits `0` for unavailable/blocked runtime states.
+
+The probe status message includes a `Dawn interop:` diagnostic and a structured `xr_dawn_interop=` line. Patched vendor builds should report `xr_dawn_interop=ready`, meaning Dawn exposes the Vulkan instance, physical device, device, queue family, queue, and runtime-owned `VkImage` wrapping. Prebuilt Dawn package builds should instead report `xr_dawn_interop=missing`. The patched vendor build registers `dusk_openxr_probe_dawn_interop`, an `openxr`-labeled CTest that runs the probe with `--require-dawn-interop`; unpatched builds register `dusk_openxr_probe_dawn_interop_missing` to assert the expected gate. All OpenXR probe builds also register `dusk_openxr_probe_invalid_runtime`, which sets `XR_RUNTIME_JSON` to a missing file and verifies the unavailable-runtime diagnostic path.
+
+When a headset/runtime is available, configure the patched vendor build with `-DDUSK_OPENXR_ENABLE_LIVE_TESTS=ON` to register `dusk_openxr_probe_live_clear`. That live test runs without `--allow-unavailable`, requires `xr_dawn_interop=ready`, and passes only when the Dawn/OpenXR proof reaches `xr_proof_gate=cleared`.
+
+For no-headset development, the preferred mock runtime is Monado's simulated HMD on Windows. Build an in-process Monado runtime with the simulated driver and use the null compositor for headless proof runs. The current tested Monado snapshot also needs `docs/patches/monado-openxr-enable2-app-owned-vkinstance.patch` when using Dawn's app-owned `VkInstance` with `XR_KHR_vulkan_enable2`:
+
+```powershell
+git clone --depth 1 https://gitlab.freedesktop.org/monado/monado.git build\monado-src
+git -C build\monado-src apply ..\..\docs\patches\monado-openxr-enable2-app-owned-vkinstance.patch
+
+cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cmake -S build\monado-src -B build\monado-inprocess -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_TOOLCHAIN_FILE=""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\vcpkg\scripts\buildsystems\vcpkg.cmake"" -DXRT_FEATURE_SERVICE=OFF -DXRT_BUILD_DRIVER_SIMULATED=ON"
+cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cmake --build build\monado-inprocess --target openxr_monado --config RelWithDebInfo"
+
+$env:XR_RUNTIME_JSON = "$PWD\build\monado-inprocess\openxr_monado-dev.json"
+$env:SIMULATED_ENABLE = "TRUE"
+$env:XRT_COMPOSITOR_NULL = "TRUE"
+$env:XRT_DEBUG_GUI = "FALSE"
+$env:OXR_DEBUG_GUI = "FALSE"
+$env:PATH = "$PWD\build\monado-inprocess\src\xrt\targets\openxr;$PWD\build\monado-inprocess\vcpkg_installed\x64-windows\bin;$env:PATH"
+.\build\windows-msvc-dawn-vendor-openxr\dusk_openxr_probe.exe --require-dawn-interop
+```
+
+The same runtime manifest can be wired into CTest by configuring the patched Dawn build with `-DDUSK_OPENXR_ENABLE_LIVE_TESTS=ON`, `-DDUSK_OPENXR_TEST_RUNTIME_JSON=C:/path/to/monado-inprocess/openxr_monado-dev.json`, `-DDUSK_OPENXR_TEST_ENVIRONMENT=SIMULATED_ENABLE=TRUE;XRT_COMPOSITOR_NULL=TRUE;XRT_DEBUG_GUI=FALSE;OXR_DEBUG_GUI=FALSE`, and `-DDUSK_OPENXR_TEST_PATH_DIRS=C:/path/to/monado-inprocess/src/xrt/targets/openxr;C:/path/to/monado-inprocess/vcpkg_installed/x64-windows/bin`. Then run `ctest -R dusk_openxr_probe_live_clear --output-on-failure`; a passing test prints `xr_proof_gate=cleared` after creating an OpenXR session with Dawn's Vulkan device and clearing both mock eye swapchain images. SteamVR's null driver can also advertise a fake headset, but Monado is a better fit for this gate because it is a native OpenXR runtime with a simulated HMD driver and a generated `XR_RUNTIME_JSON` manifest.
 
 If no OpenXR loader target is found, Aurora still builds the XR API stubs and Dusk can run normally, but XR requests will report unavailable.
 
@@ -118,15 +170,17 @@ If no path is specified, Dusk defaults to `game.iso` in the current working dire
 OpenXR is controlled by the persistent `backend.xrMode` setting and by the prelaunch **OpenXR Mode** control:
 
 * `Disabled` / **Off**: normal flat startup. This is the default.
-* `Optional` / **Enabled**: Dusk requests XR, validates/forces Vulkan, and continues with normal flat startup if Vulkan, the OpenXR loader/runtime, or Aurora XR activation is unavailable.
-* `Required`: Dusk requests XR, validates/forces Vulkan, and fails startup if Vulkan or OpenXR activation is unavailable.
+* `Optional` / **Enabled**: Dusk requests XR, validates/forces Vulkan, and continues with normal flat startup if Vulkan, the OpenXR loader/runtime, or Aurora XR ready/active initialization is unavailable.
+* `Required`: Dusk requests XR, validates/forces Vulkan, and fails startup if Vulkan is unavailable or OpenXR cannot initialize to a ready/active state.
 
 The graphics backend setting remains `backend.graphicsBackend`; use `auto` or `vulkan` for XR testing. Do not set an `openxr` backend ID. Changing OpenXR mode or backend settings requires restart from the prelaunch UI.
 
 Current implementation notes:
 
 * Aurora exposes XR config/status/frame/eye APIs and can probe an OpenXR runtime when built with `AURORA_ENABLE_OPENXR=ON` and an OpenXR loader target.
-* Active eye rendering is still blocked until Aurora's Dawn/WebGPU path exposes native Vulkan image handles and OpenXR swapchain interop. Until that is implemented, XR requests should gracefully remain flat in Optional mode.
+* The normal prebuilt Dawn package is still blocked because it does not expose the Vulkan device/queue or Windows-compatible OpenXR swapchain image interop. The patched source-built Dawn experiment adds those hooks and runs a small session/swapchain clear proof before any Aurora EFB target wiring is enabled.
+* If startup reports `No OpenXR head-mounted-display system available`, the loader/runtime was reachable but `xrGetSystem()` did not expose an HMD. Confirm the active runtime is the intended one and that the headset or streamer app is connected before treating the Dawn proof as failed.
+* Active eye rendering remains blocked until the patched-Dawn proof succeeds on a healthy runtime and Aurora's EFB targets are parameterized for per-eye render targets. Until then, XR requests should gracefully remain flat in Optional mode.
 * Aurora does not yet provide a separate OpenXR quad-layer/flat UI render target. Ordinary HUD/menu/RmlUi/ImGui UI stays in the flat path for launch; world-projected targeting packets are queued for per-eye drawing when active eye rendering becomes available.
 * `F8` recenters the Dusk XR app-space origin from the latest valid HMD pose when XR tracking is active. It logs whether XR is inactive or tracking is unavailable. State Share uses `Shift+F8`.
 

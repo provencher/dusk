@@ -1,0 +1,20 @@
+diff --git a/src/xrt/state_trackers/oxr/oxr_api_system.c b/src/xrt/state_trackers/oxr/oxr_api_system.c
+index 25c8dd8dc..eaa5e0d17 100644
+--- a/src/xrt/state_trackers/oxr/oxr_api_system.c
++++ b/src/xrt/state_trackers/oxr/oxr_api_system.c
+@@ -337,10 +337,14 @@ oxr_xrGetVulkanGraphicsDevice2KHR(XrInstance instance,
+ 
+ 	OXR_VERIFY_SYSTEM_AND_GET(&log, inst, getInfo->systemId, sys);
+ 	OXR_VERIFY_ARG_NOT_NULL(&log, vkPhysicalDevice);
+-	OXR_VERIFY_ARG_NOT_NULL(&log, sys->vk_get_instance_proc_addr);
+ 	OXR_VERIFY_XSYSC(&log, sys);
+ 
+-	return oxr_vk_get_physical_device(&log, inst, sys, getInfo->vulkanInstance, sys->vk_get_instance_proc_addr,
++	PFN_vkGetInstanceProcAddr vk_get_instance_proc_addr = sys->vk_get_instance_proc_addr != NULL
++	                                                           ? sys->vk_get_instance_proc_addr
++	                                                           : vkGetInstanceProcAddr;
++
++	return oxr_vk_get_physical_device(&log, inst, sys, getInfo->vulkanInstance, vk_get_instance_proc_addr,
+ 	                                  vkPhysicalDevice);
+ }
+ 

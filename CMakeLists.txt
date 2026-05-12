@@ -547,6 +547,76 @@ endif ()
 include(extern/aurora/cmake/AuroraCopyRuntimeDLLs.cmake)
 aurora_copy_runtime_dlls(dusk)
 
+if (AURORA_ENABLE_OPENXR AND NOT ANDROID AND NOT IOS AND NOT TVOS)
+    option(DUSK_OPENXR_ENABLE_LIVE_TESTS "Enable OpenXR tests that require a live headset/runtime" OFF)
+    set(DUSK_OPENXR_TEST_RUNTIME_JSON "" CACHE FILEPATH "Optional XR_RUNTIME_JSON manifest for OpenXR live/mock runtime tests")
+    set(DUSK_OPENXR_TEST_ENVIRONMENT "" CACHE STRING "Optional semicolon-separated extra environment for OpenXR live/mock runtime tests")
+    set(DUSK_OPENXR_TEST_PATH_DIRS "" CACHE STRING "Optional semicolon-separated PATH entries for OpenXR live/mock runtime tests")
+    add_executable(dusk_openxr_probe tools/openxr_probe_main.cpp)
+    target_link_libraries(dusk_openxr_probe PRIVATE
+        aurora::core aurora::gx aurora::gd aurora::si aurora::vi aurora::pad aurora::mtx aurora::os aurora::card
+        Threads::Threads)
+    if (WIN32)
+        target_sources(dusk_openxr_probe PRIVATE ${DUSK_WINDOWS_ICON_ICO} ${DUSK_WINDOWS_RC})
+        if (MSVC)
+            target_link_options(dusk_openxr_probe PRIVATE /MANIFEST:NO /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup)
+        endif ()
+    endif ()
+    aurora_copy_runtime_dlls(dusk_openxr_probe)
+    enable_testing()
+    add_test(NAME dusk_openxr_probe_smoke COMMAND dusk_openxr_probe --allow-unavailable)
+    set_tests_properties(dusk_openxr_probe_smoke PROPERTIES
+        LABELS openxr
+        PASS_REGULAR_EXPRESSION "xr_proof_gate="
+        FAIL_REGULAR_EXPRESSION "xr_status=disabled|backend=[^4]")
+    add_test(NAME dusk_openxr_probe_invalid_runtime COMMAND dusk_openxr_probe --allow-unavailable)
+    set_tests_properties(dusk_openxr_probe_invalid_runtime PROPERTIES
+        LABELS openxr
+        ENVIRONMENT "XR_RUNTIME_JSON=${CMAKE_CURRENT_BINARY_DIR}/missing-openxr-runtime.json"
+        PASS_REGULAR_EXPRESSION "xr_status=unavailable"
+        FAIL_REGULAR_EXPRESSION "xr_status=disabled")
+    if (AURORA_DAWN_OPENXR_PATCH_APPLIED)
+        add_test(NAME dusk_openxr_probe_dawn_interop COMMAND dusk_openxr_probe --allow-unavailable --require-dawn-interop)
+        set_tests_properties(dusk_openxr_probe_dawn_interop PROPERTIES
+            LABELS openxr
+            PASS_REGULAR_EXPRESSION "xr_dawn_interop=ready"
+            FAIL_REGULAR_EXPRESSION "current Dawn package does not expose|patched Dawn returned incomplete")
+        if (DUSK_OPENXR_ENABLE_LIVE_TESTS)
+            add_test(NAME dusk_openxr_probe_live_clear COMMAND dusk_openxr_probe --require-dawn-interop)
+            set_tests_properties(dusk_openxr_probe_live_clear PROPERTIES
+                LABELS "openxr;openxr-live"
+                PASS_REGULAR_EXPRESSION "xr_proof_gate=cleared"
+                FAIL_REGULAR_EXPRESSION "xr_proof_gate=no_hmd|xr_status=unavailable|xr_dawn_interop=missing")
+            set(_dusk_openxr_live_environment)
+            if (DUSK_OPENXR_TEST_RUNTIME_JSON)
+                list(APPEND _dusk_openxr_live_environment "XR_RUNTIME_JSON=${DUSK_OPENXR_TEST_RUNTIME_JSON}")
+            endif ()
+            if (DUSK_OPENXR_TEST_ENVIRONMENT)
+                list(APPEND _dusk_openxr_live_environment ${DUSK_OPENXR_TEST_ENVIRONMENT})
+            endif ()
+            if (_dusk_openxr_live_environment)
+                set_tests_properties(dusk_openxr_probe_live_clear PROPERTIES
+                    ENVIRONMENT "${_dusk_openxr_live_environment}")
+            endif ()
+            if (DUSK_OPENXR_TEST_PATH_DIRS)
+                set(_dusk_openxr_live_environment_modification)
+                foreach (_dusk_openxr_test_path_dir IN LISTS DUSK_OPENXR_TEST_PATH_DIRS)
+                    list(APPEND _dusk_openxr_live_environment_modification
+                        "PATH=path_list_prepend:${_dusk_openxr_test_path_dir}")
+                endforeach ()
+                set_tests_properties(dusk_openxr_probe_live_clear PROPERTIES
+                    ENVIRONMENT_MODIFICATION "${_dusk_openxr_live_environment_modification}")
+            endif ()
+        endif ()
+    else ()
+        add_test(NAME dusk_openxr_probe_dawn_interop_missing COMMAND dusk_openxr_probe --allow-unavailable)
+        set_tests_properties(dusk_openxr_probe_dawn_interop_missing PROPERTIES
+            LABELS openxr
+            PASS_REGULAR_EXPRESSION "xr_dawn_interop=missing"
+            FAIL_REGULAR_EXPRESSION "xr_dawn_interop=ready")
+    endif ()
+endif ()
+
 if (DUSK_SELECTED_OPT)
     if (CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
         set(_opt_flags /O2 /Ob2)
