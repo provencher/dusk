@@ -18,8 +18,8 @@ struct EyeData {
     bool poseValid = false;
     bool fovValid = false;
 
-    // Placeholders for later camera composition work. These remain identity matrices until
-    // Dusk's camera/render pass split starts consuming OpenXR eye poses and projections.
+    // Populated while an eye render is active so draw-time projection/culling helpers can
+    // inspect the exact OpenXR-derived camera state used for that eye.
     Matrix4x4 viewFromWorld{};
     Matrix4x4 projectionFromView{};
     Matrix4x4 clipFromWorld{};
@@ -38,7 +38,6 @@ enum class RecenterResult {
 
 struct WorldProjectedItem {
     dDlst_base_c* drawList = nullptr;
-    Matrix4x4 modelFromWorld{};
 };
 
 struct EyeViewToken {
@@ -68,6 +67,8 @@ const AuroraXRFrameState& frame_state() noexcept;
 uint32_t eye_count() noexcept;
 const EyeData* eye(uint32_t index) noexcept;
 const std::vector<EyeData>& eyes() noexcept;
+float conservative_culling_fovy(float baseFovyDegrees) noexcept;
+int current_eye_index() noexcept;
 
 bool begin_eye_view(view_class& view, uint32_t eyeIndex, EyeViewToken& token) noexcept;
 void end_eye_view(EyeViewToken& token) noexcept;
@@ -80,7 +81,6 @@ const RecenterOffset& recenter_offset() noexcept;
 void set_recenter_offset(const RecenterOffset& offset) noexcept;
 
 void queue_world_projected_2d(dDlst_base_c* drawList) noexcept;
-void queue_world_projected_2d(dDlst_base_c* drawList, const Matrix4x4& modelFromWorld) noexcept;
 const std::vector<WorldProjectedItem>& world_projected_queue() noexcept;
 void clear_world_projected_queue() noexcept;
 

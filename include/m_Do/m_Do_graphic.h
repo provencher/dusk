@@ -243,10 +243,10 @@ public:
         #endif
     }
 
-    static ResTIMG* getFrameBufferTimg() { return mFrameBufferTimg; }
-    static ResTIMG* getZbufferTimg() { return mZbufferTimg; }
-    static void* getFrameBufferTex() { return mFrameBufferTex; }
-    static void* getZbufferTex() { return mZbufferTex; }
+    static ResTIMG* getFrameBufferTimg();
+    static ResTIMG* getZbufferTimg();
+    static void* getFrameBufferTex();
+    static void* getZbufferTex();
     static void setFadeRate(f32 rate) { mFadeRate = rate; }
     static f32 getFadeRate() { return mFadeRate; }
     static f32 getFadeSpeed() { return mFadeSpeed; }
@@ -254,8 +254,8 @@ public:
     static GXColor& getFadeColor() { return mFadeColor; }
     static GXColor& getBackColor() { return mBackColor; }
     static void endRender() { JFWDisplay::getManager()->endRender(); }
-    static TGXTexObj* getZbufferTexObj() { return &mZbufferTexObj; }
-    static TGXTexObj* getFrameBufferTexObj() { return &mFrameBufferTexObj; }
+    static TGXTexObj* getZbufferTexObj();
+    static TGXTexObj* getFrameBufferTexObj();
     static void setFrameRate(u16 i_rate) { JFWDisplay::getManager()->setFrameRate(i_rate); }
 
     static int getFrameBufferSize() {
@@ -304,6 +304,10 @@ public:
 
     static TGXTexObj mFrameBufferTexObj;
     static TGXTexObj mZbufferTexObj;
+#if TARGET_PC
+    static TGXTexObj mXrEyeFrameBufferTexObj[2];
+    static TGXTexObj mXrEyeZbufferTexObj[2];
+#endif
     static bloom_c m_bloom;
     static Mtx mBlureMtx;
     static GXColor mBackColor;
@@ -313,6 +317,12 @@ public:
     static void* mFrameBufferTex;
     static ResTIMG* mZbufferTimg;
     static void* mZbufferTex;
+#if TARGET_PC
+    static ResTIMG* mXrEyeFrameBufferTimg[2];
+    static void* mXrEyeFrameBufferTex[2];
+    static ResTIMG* mXrEyeZbufferTimg[2];
+    static void* mXrEyeZbufferTex[2];
+#endif
     static f32 mFadeRate;
     static f32 mFadeSpeed;
     static u8 mBlureFlag;

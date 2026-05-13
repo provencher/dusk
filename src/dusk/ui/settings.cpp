@@ -214,8 +214,9 @@ void add_xr_mode_control(Pane& leftPane, Pane& rightPane, bool prelaunch) {
                 "separate OpenXR graphics backend is added.<br/><br/>"
                 "<b>Enabled</b> falls back to normal flat startup if Vulkan or OpenXR cannot "
                 "initialize to ready or active. <b>Required</b> fails startup instead.<br/><br/>"
-                "Changes require a restart. Current XR rendering remains limited until Aurora "
-                "has native Vulkan/OpenXR swapchain image interop.");
+                "Changes require a restart. Patched-Dawn Vulkan builds can render stereo eyes "
+                "and a head-locked UI layer directly into OpenXR swapchains. VR post effects "
+                "still need scene validation, and real-headset validation is still incomplete.");
         });
 }
 

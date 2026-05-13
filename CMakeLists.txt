@@ -567,11 +567,13 @@ if (AURORA_ENABLE_OPENXR AND NOT ANDROID AND NOT IOS AND NOT TVOS)
     add_test(NAME dusk_openxr_probe_smoke COMMAND dusk_openxr_probe --allow-unavailable)
     set_tests_properties(dusk_openxr_probe_smoke PROPERTIES
         LABELS openxr
+        TIMEOUT 30
         PASS_REGULAR_EXPRESSION "xr_proof_gate="
         FAIL_REGULAR_EXPRESSION "xr_status=disabled|backend=[^4]")
     add_test(NAME dusk_openxr_probe_invalid_runtime COMMAND dusk_openxr_probe --allow-unavailable)
     set_tests_properties(dusk_openxr_probe_invalid_runtime PROPERTIES
         LABELS openxr
+        TIMEOUT 30
         ENVIRONMENT "XR_RUNTIME_JSON=${CMAKE_CURRENT_BINARY_DIR}/missing-openxr-runtime.json"
         PASS_REGULAR_EXPRESSION "xr_status=unavailable"
         FAIL_REGULAR_EXPRESSION "xr_status=disabled")
@@ -579,14 +581,28 @@ if (AURORA_ENABLE_OPENXR AND NOT ANDROID AND NOT IOS AND NOT TVOS)
         add_test(NAME dusk_openxr_probe_dawn_interop COMMAND dusk_openxr_probe --allow-unavailable --require-dawn-interop)
         set_tests_properties(dusk_openxr_probe_dawn_interop PROPERTIES
             LABELS openxr
+            TIMEOUT 30
             PASS_REGULAR_EXPRESSION "xr_dawn_interop=ready"
             FAIL_REGULAR_EXPRESSION "current Dawn package does not expose|patched Dawn returned incomplete")
         if (DUSK_OPENXR_ENABLE_LIVE_TESTS)
-            add_test(NAME dusk_openxr_probe_live_clear COMMAND dusk_openxr_probe --require-dawn-interop --exercise-eye-targets)
+            add_test(NAME dusk_openxr_probe_live_clear
+                COMMAND dusk_openxr_probe --require-dawn-interop --exercise-eye-targets --exercise-flat-ui-target)
             set_tests_properties(dusk_openxr_probe_live_clear PROPERTIES
                 LABELS "openxr;openxr-live"
-                PASS_REGULAR_EXPRESSION "xr_live_gate=cleared_submitted"
-                FAIL_REGULAR_EXPRESSION "xr_proof_gate=no_hmd|xr_status=unavailable|xr_dawn_interop=missing|xr_eye_target_gate=proof_not_cleared|xr_eye_target_gate=no_active_frame|xr_eye_target_gate=no_eye|xr_eye_target_gate=partial|xr_eye_target_gate=lost")
+                TIMEOUT 60
+                PASS_REGULAR_EXPRESSION "xr_live_gate=cleared_submitted_flat_ui_submitted"
+                FAIL_REGULAR_EXPRESSION "xr_proof_gate=no_hmd|xr_status=unavailable|xr_dawn_interop=missing|xr_eye_target_gate=proof_not_cleared|xr_eye_target_gate=no_active_frame|xr_eye_target_gate=no_eye|xr_eye_target_gate=partial|xr_eye_target_gate=lost|xr_flat_ui_target_gate=proof_not_cleared|xr_flat_ui_target_gate=no_active_frame|xr_flat_ui_target_gate=no_flat_ui|xr_flat_ui_target_gate=lost")
+            set_property(TEST dusk_openxr_probe_live_clear APPEND PROPERTY
+                PASS_REGULAR_EXPRESSION "xr_vulkan_extension_gate=validated")
+            set_property(TEST dusk_openxr_probe_live_clear APPEND PROPERTY
+                FAIL_REGULAR_EXPRESSION "xr_vulkan_extension_gate=missing_instance|xr_vulkan_extension_gate=missing_device|xr_vulkan_extension_gate=instance_query_unavailable|xr_vulkan_extension_gate=device_query_unavailable")
+            add_test(NAME dusk_openxr_probe_headless_mirror
+                COMMAND dusk_openxr_probe --require-dawn-interop --exercise-headless-mirror-frame)
+            set_tests_properties(dusk_openxr_probe_headless_mirror PROPERTIES
+                LABELS "openxr;openxr-live"
+                TIMEOUT 60
+                PASS_REGULAR_EXPRESSION "xr_headless_mirror_gate=continued"
+                FAIL_REGULAR_EXPRESSION "xr_proof_gate=no_hmd|xr_status=unavailable|xr_dawn_interop=missing|xr_headless_mirror_gate=proof_not_cleared|xr_headless_mirror_gate=no_active_frame|xr_headless_mirror_gate=no_submit|xr_headless_mirror_gate=lost")
             set(_dusk_openxr_live_environment)
             if (DUSK_OPENXR_TEST_RUNTIME_JSON)
                 list(APPEND _dusk_openxr_live_environment "XR_RUNTIME_JSON=${DUSK_OPENXR_TEST_RUNTIME_JSON}")
@@ -597,6 +613,8 @@ if (AURORA_ENABLE_OPENXR AND NOT ANDROID AND NOT IOS AND NOT TVOS)
             if (_dusk_openxr_live_environment)
                 set_tests_properties(dusk_openxr_probe_live_clear PROPERTIES
                     ENVIRONMENT "${_dusk_openxr_live_environment}")
+                set_tests_properties(dusk_openxr_probe_headless_mirror PROPERTIES
+                    ENVIRONMENT "${_dusk_openxr_live_environment}")
             endif ()
             if (DUSK_OPENXR_TEST_PATH_DIRS)
                 set(_dusk_openxr_live_environment_modification)
@@ -606,16 +624,24 @@ if (AURORA_ENABLE_OPENXR AND NOT ANDROID AND NOT IOS AND NOT TVOS)
                 endforeach ()
                 set_tests_properties(dusk_openxr_probe_live_clear PROPERTIES
                     ENVIRONMENT_MODIFICATION "${_dusk_openxr_live_environment_modification}")
+                set_tests_properties(dusk_openxr_probe_headless_mirror PROPERTIES
+                    ENVIRONMENT_MODIFICATION "${_dusk_openxr_live_environment_modification}")
             endif ()
             add_test(NAME dusk_openxr_probe_mock_hmd_motion
                 COMMAND dusk_openxr_probe
                     --require-dawn-interop
+                    --validate-view-geometry
                     --exercise-head-motion
                     --head-motion-image-dir "${CMAKE_CURRENT_BINARY_DIR}/openxr-head-motion-images")
             set_tests_properties(dusk_openxr_probe_mock_hmd_motion PROPERTIES
                 LABELS "openxr;openxr-live;openxr-mock-hmd"
+                TIMEOUT 90
                 PASS_REGULAR_EXPRESSION "xr_head_motion_gate=validated"
                 FAIL_REGULAR_EXPRESSION "xr_proof_gate=no_hmd|xr_status=unavailable|xr_dawn_interop=missing|xr_head_motion_gate=proof_not_cleared|xr_head_motion_gate=no_initial_pose|xr_head_motion_gate=no_later_pose|xr_head_motion_gate=no_lateral_motion|xr_head_motion_gate=no_rotational_motion|xr_head_motion_gate=image_static|xr_head_motion_gate=no_stereo_separation")
+            set_property(TEST dusk_openxr_probe_mock_hmd_motion APPEND PROPERTY
+                PASS_REGULAR_EXPRESSION "xr_view_geometry_gate=validated")
+            set_property(TEST dusk_openxr_probe_mock_hmd_motion APPEND PROPERTY
+                FAIL_REGULAR_EXPRESSION "xr_view_geometry_gate=proof_not_cleared|xr_view_geometry_gate=insufficient_views|xr_view_geometry_gate=no_pose|xr_view_geometry_gate=invalid_recommended_image|xr_view_geometry_gate=invalid_fov|xr_view_geometry_gate=unexpected_fov_signs|xr_view_geometry_gate=implausible_fov|xr_view_geometry_gate=implausible_ipd")
             set(_dusk_openxr_mock_environment
                 "SIMULATED_ENABLE=TRUE"
                 "SIMULATED_ROTATE=FALSE"
@@ -640,6 +666,7 @@ if (AURORA_ENABLE_OPENXR AND NOT ANDROID AND NOT IOS AND NOT TVOS)
         add_test(NAME dusk_openxr_probe_dawn_interop_missing COMMAND dusk_openxr_probe --allow-unavailable)
         set_tests_properties(dusk_openxr_probe_dawn_interop_missing PROPERTIES
             LABELS openxr
+            TIMEOUT 30
             PASS_REGULAR_EXPRESSION "xr_dawn_interop=missing"
             FAIL_REGULAR_EXPRESSION "xr_dawn_interop=ready")
     endif ()

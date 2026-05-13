@@ -2,6 +2,7 @@
 
 #include "m_Do/m_Do_mtx.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace dusk::vr {
@@ -9,6 +10,9 @@ namespace {
 
 constexpr float kMetersToGameUnits = 100.0f;
 constexpr float kPi = 3.14159265358979323846f;
+constexpr float kRadiansToDegrees = 180.0f / kPi;
+constexpr float kCullingFovMotionMarginDegrees = 12.0f;
+constexpr float kMaxConservativeCullingFovyDegrees = 170.0f;
 
 AuroraXRQuaternionf yaw_quaternion(float yaw) noexcept {
     const float halfYaw = yaw * 0.5f;
@@ -29,6 +33,7 @@ struct State {
     std::vector<EyeData> eyes;
     RecenterOffset recenterOffset{};
     bool recenterPending = false;
+    int currentEyeIndex = -1;
     std::vector<WorldProjectedItem> worldProjectedQueue;
 };
 
@@ -232,17 +237,11 @@ void update_lookat_from_inv_view(view_class& view) noexcept {
     view.bank = 0;
 }
 
-WorldProjectedItem make_world_projected_item(dDlst_base_c* drawList, const Matrix4x4& modelFromWorld) noexcept {
-    return WorldProjectedItem{
-        .drawList = drawList,
-        .modelFromWorld = modelFromWorld,
-    };
-}
-
 }  // namespace
 
 void begin_frame() noexcept {
     clear_world_projected_queue();
+    g_state.currentEyeIndex = -1;
 
     g_state.frameState = aurora_xr_get_frame_state();
     g_state.frameState.requested = g_state.frameState.requested || aurora_xr_is_requested();
@@ -290,6 +289,29 @@ const EyeData* eye(uint32_t index) noexcept {
 
 const std::vector<EyeData>& eyes() noexcept { return g_state.eyes; }
 
+int current_eye_index() noexcept { return g_state.currentEyeIndex; }
+
+float conservative_culling_fovy(float baseFovyDegrees) noexcept {
+    if (!active()) {
+        return baseFovyDegrees;
+    }
+
+    float cullingFovy = baseFovyDegrees;
+    for (const EyeData& eyeData : g_state.eyes) {
+        if (!eyeData.fovValid) {
+            continue;
+        }
+
+        const AuroraXRFov& fov = eyeData.rawView.fov;
+        const float verticalFovy = (fov.angleUp - fov.angleDown) * kRadiansToDegrees;
+        if (verticalFovy > 0.0f && !std::isnan(verticalFovy)) {
+            cullingFovy = std::max(cullingFovy, verticalFovy + kCullingFovMotionMarginDegrees);
+        }
+    }
+
+    return std::min(cullingFovy, kMaxConservativeCullingFovyDegrees);
+}
+
 bool begin_eye_view(view_class& view, uint32_t eyeIndex, EyeViewToken& token) noexcept {
     save_view(token, view, eyeIndex);
 
@@ -333,12 +355,16 @@ bool begin_eye_view(view_class& view, uint32_t eyeIndex, EyeViewToken& token) no
     mutableEye.clipFromWorld = matrix4_from_mtx44(view.projViewMtx);
 
     token.active = true;
+    g_state.currentEyeIndex = static_cast<int>(eyeIndex);
     return true;
 }
 
 void end_eye_view(EyeViewToken& token) noexcept {
     if (token.active) {
         restore_view(token);
+    }
+    if (g_state.currentEyeIndex == static_cast<int>(token.eyeIndex)) {
+        g_state.currentEyeIndex = -1;
     }
     token.active = false;
     token.view = nullptr;
@@ -377,14 +403,10 @@ const RecenterOffset& recenter_offset() noexcept { return g_state.recenterOffset
 void set_recenter_offset(const RecenterOffset& offset) noexcept { g_state.recenterOffset = offset; }
 
 void queue_world_projected_2d(dDlst_base_c* drawList) noexcept {
-    queue_world_projected_2d(drawList, identity_matrix());
-}
-
-void queue_world_projected_2d(dDlst_base_c* drawList, const Matrix4x4& modelFromWorld) noexcept {
     if (drawList == nullptr) {
         return;
     }
-    g_state.worldProjectedQueue.emplace_back(make_world_projected_item(drawList, modelFromWorld));
+    g_state.worldProjectedQueue.emplace_back(WorldProjectedItem{.drawList = drawList});
 }
 
 const std::vector<WorldProjectedItem>& world_projected_queue() noexcept {

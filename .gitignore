@@ -37,6 +37,8 @@ compile_commands.json
 # Miscellaneous
 *.exe
 *.zip
+validation-logs/
+validation-screenshots/
 
 # MacOS
 .DS_Store

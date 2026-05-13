@@ -137,6 +137,54 @@
       ]
     },
     {
+      "name": "windows-msvc-dawn-vendor-openxr",
+      "displayName": "Windows (MSVC, vendored Dawn OpenXR)",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "inherits": [
+        "relwithdebinfo",
+        "windows-msvc"
+      ],
+      "cacheVariables": {
+        "AURORA_ENABLE_OPENXR": {
+          "type": "BOOL",
+          "value": true
+        },
+        "AURORA_FETCH_OPENXR_SDK": {
+          "type": "BOOL",
+          "value": true
+        },
+        "AURORA_DAWN_PROVIDER": "vendor",
+        "AURORA_DAWN_LINKAGE": "static",
+        "AURORA_DAWN_APPLY_OPENXR_PATCH": {
+          "type": "BOOL",
+          "value": true
+        },
+        "DUSK_OPENXR_ENABLE_LIVE_TESTS": {
+          "type": "BOOL",
+          "value": true
+        }
+      }
+    },
+    {
+      "name": "windows-msvc-no-openxr",
+      "displayName": "Windows (MSVC, no OpenXR)",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "inherits": [
+        "relwithdebinfo",
+        "windows-msvc"
+      ],
+      "cacheVariables": {
+        "AURORA_ENABLE_OPENXR": {
+          "type": "BOOL",
+          "value": false
+        },
+        "AURORA_FETCH_OPENXR_SDK": {
+          "type": "BOOL",
+          "value": false
+        }
+      }
+    },
+    {
       "name": "windows-arm64-msvc",
       "displayName": "Windows ARM64 (MSVC)",
       "generator": "Ninja",
@@ -601,6 +649,18 @@
       "configurePreset": "windows-msvc-relwithdebinfo",
       "description": "Windows (MSVC) release build with debug info",
       "displayName": "Windows (MSVC) RelWithDebInfo"
+    },
+    {
+      "name": "windows-msvc-dawn-vendor-openxr",
+      "configurePreset": "windows-msvc-dawn-vendor-openxr",
+      "description": "Windows (MSVC) vendored Dawn OpenXR build with debug info",
+      "displayName": "Windows (MSVC, vendored Dawn OpenXR)"
+    },
+    {
+      "name": "windows-msvc-no-openxr",
+      "configurePreset": "windows-msvc-no-openxr",
+      "description": "Windows (MSVC) build without OpenXR loader support",
+      "displayName": "Windows (MSVC, no OpenXR)"
     },
     {
       "name": "windows-clang-debug",

@@ -90,12 +90,47 @@ const char* dawn_interop_status(const char* message) {
   return "unknown";
 }
 
+const char* vulkan_extension_validation_status(AuroraXRVulkanExtensionValidation validation, const char* message) {
+  switch (validation) {
+  case AURORA_XR_VULKAN_EXTENSION_VALIDATION_NOT_QUERIED:
+    return "not_queried";
+  case AURORA_XR_VULKAN_EXTENSION_VALIDATION_VALIDATED:
+    return "validated";
+  case AURORA_XR_VULKAN_EXTENSION_VALIDATION_MISSING_INSTANCE:
+    return "missing_instance";
+  case AURORA_XR_VULKAN_EXTENSION_VALIDATION_MISSING_DEVICE:
+    return "missing_device";
+  case AURORA_XR_VULKAN_EXTENSION_VALIDATION_INSTANCE_QUERY_UNAVAILABLE:
+    return "instance_query_unavailable";
+  case AURORA_XR_VULKAN_EXTENSION_VALIDATION_DEVICE_QUERY_UNAVAILABLE:
+    return "device_query_unavailable";
+  case AURORA_XR_VULKAN_EXTENSION_VALIDATION_UNKNOWN:
+  default:
+    break;
+  }
+
+  if (message_contains(message, "OpenXR runtime requires Vulkan instance extensions that")) {
+    return "missing_instance";
+  }
+  if (message_contains(message, "OpenXR runtime requires Vulkan device extensions that")) {
+    return "missing_device";
+  }
+  if (message_contains(message, "cannot validate OpenXR runtime Vulkan instance extension requirements")) {
+    return "instance_query_unavailable";
+  }
+  if (message_contains(message, "cannot validate OpenXR runtime Vulkan device extension requirements")) {
+    return "device_query_unavailable";
+  }
+  return "unknown";
+}
+
 const char* exercise_eye_targets(uint32_t viewCount) {
   if (viewCount == 0) {
     return "no_views";
   }
 
   constexpr uint32_t MaxFrames = 240;
+  aurora_debug_set_surface_ready(false);
   for (uint32_t frame = 0; frame < MaxFrames; ++frame) {
     aurora_update();
     if (!aurora_begin_frame()) {
@@ -130,6 +165,133 @@ const char* exercise_eye_targets(uint32_t viewCount) {
   return aurora_xr_is_active() ? "no_eye" : "no_active_frame";
 }
 
+const char* exercise_flat_ui_target() {
+  constexpr uint32_t MaxFrames = 240;
+  for (uint32_t frame = 0; frame < MaxFrames; ++frame) {
+    aurora_update();
+    if (!aurora_begin_frame()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(4));
+      continue;
+    }
+
+    bool renderedFlatUi = false;
+    if (aurora_xr_should_render() && aurora_xr_begin_flat_ui()) {
+      renderedFlatUi = true;
+      aurora_xr_end_flat_ui();
+    }
+    aurora_end_frame();
+
+    if (renderedFlatUi) {
+      return "submitted";
+    }
+    if (aurora_xr_get_status() == AURORA_XR_LOST) {
+      return "lost";
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(4));
+  }
+
+  return aurora_xr_is_active() ? "no_flat_ui" : "no_active_frame";
+}
+
+struct XrTargetExerciseResult {
+  const char* eyeGate = "not_requested";
+  const char* flatUiGate = "not_requested";
+};
+
+XrTargetExerciseResult exercise_eye_and_flat_ui_targets(uint32_t viewCount) {
+  if (viewCount == 0) {
+    return {.eyeGate = "no_views", .flatUiGate = "no_active_frame"};
+  }
+
+  constexpr uint32_t MaxFrames = 240;
+  for (uint32_t frame = 0; frame < MaxFrames; ++frame) {
+    aurora_update();
+    if (!aurora_begin_frame()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(4));
+      continue;
+    }
+
+    uint32_t renderedEyes = 0;
+    bool renderedFlatUi = false;
+    if (aurora_xr_should_render()) {
+      for (uint32_t eyeIndex = 0; eyeIndex < viewCount; ++eyeIndex) {
+        if (aurora_xr_begin_eye(eyeIndex)) {
+          ++renderedEyes;
+          aurora_xr_end_eye();
+        }
+      }
+      if (aurora_xr_begin_flat_ui()) {
+        renderedFlatUi = true;
+        aurora_xr_end_flat_ui();
+      }
+    }
+    aurora_end_frame();
+
+    if (renderedEyes == viewCount && renderedFlatUi) {
+      return {.eyeGate = "submitted", .flatUiGate = "submitted"};
+    }
+    if (aurora_xr_get_status() == AURORA_XR_LOST) {
+      return {.eyeGate = renderedEyes == viewCount ? "submitted" : "lost",
+              .flatUiGate = renderedFlatUi ? "submitted" : "lost"};
+    }
+    if (renderedEyes != 0 && renderedEyes != viewCount) {
+      return {.eyeGate = "partial", .flatUiGate = renderedFlatUi ? "submitted" : "no_flat_ui"};
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(4));
+  }
+
+  return aurora_xr_is_active() ? XrTargetExerciseResult{.eyeGate = "no_eye", .flatUiGate = "no_flat_ui"}
+                               : XrTargetExerciseResult{.eyeGate = "no_active_frame",
+                                                        .flatUiGate = "no_active_frame"};
+}
+
+const char* exercise_headless_mirror_frame(uint32_t viewCount) {
+  if (viewCount == 0) {
+    return "no_views";
+  }
+
+  constexpr uint32_t MaxFrames = 240;
+  for (uint32_t frame = 0; frame < MaxFrames; ++frame) {
+    aurora_update();
+    if (!aurora_begin_frame()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(4));
+      continue;
+    }
+
+    uint32_t renderedEyes = 0;
+    bool renderedFlatUi = false;
+    if (aurora_xr_should_render()) {
+      for (uint32_t eyeIndex = 0; eyeIndex < viewCount; ++eyeIndex) {
+        if (aurora_xr_begin_eye(eyeIndex)) {
+          ++renderedEyes;
+          aurora_xr_end_eye();
+        }
+      }
+      if (aurora_xr_begin_flat_ui()) {
+        renderedFlatUi = true;
+        aurora_xr_end_flat_ui();
+      }
+    }
+    aurora_end_frame();
+
+    if (renderedEyes == viewCount && renderedFlatUi && aurora_xr_get_status() != AURORA_XR_LOST) {
+      aurora_debug_set_surface_ready(true);
+      return "continued";
+    }
+    if (aurora_xr_get_status() == AURORA_XR_LOST) {
+      aurora_debug_set_surface_ready(true);
+      return "lost";
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(4));
+  }
+
+  aurora_debug_set_surface_ready(true);
+  return aurora_xr_is_active() ? "no_submit" : "no_active_frame";
+}
+
 struct Vec3 {
   float x = 0.0f;
   float y = 0.0f;
@@ -161,6 +323,15 @@ struct HeadMotionResult {
   std::filesystem::path firstImage;
   std::filesystem::path lastImage;
   std::filesystem::path deltaImage;
+};
+
+struct ViewGeometryResult {
+  const char* gate = "not_requested";
+  float minHorizontalFovRadians = 0.0f;
+  float maxHorizontalFovRadians = 0.0f;
+  float minVerticalFovRadians = 0.0f;
+  float maxVerticalFovRadians = 0.0f;
+  float ipdMeters = 0.0f;
 };
 
 float clamp01(float value) {
@@ -238,6 +409,62 @@ bool capture_head_motion_sample(HeadMotionSample& outSample, uint32_t maxFrames)
     std::this_thread::sleep_for(std::chrono::milliseconds(4));
   }
   return false;
+}
+
+ViewGeometryResult validate_view_geometry(uint32_t viewCount) {
+  ViewGeometryResult result{};
+  if (viewCount < 2) {
+    result.gate = "insufficient_views";
+    return result;
+  }
+
+  HeadMotionSample sample{};
+  if (!capture_head_motion_sample(sample, 240)) {
+    result.gate = "no_pose";
+    return result;
+  }
+
+  const AuroraXRView views[2] = {sample.left, sample.right};
+  result.minHorizontalFovRadians = 1000.0f;
+  result.minVerticalFovRadians = 1000.0f;
+  for (const AuroraXRView& view : views) {
+    if (view.recommendedWidth == 0 || view.recommendedHeight == 0 || view.recommendedSampleCount == 0) {
+      result.gate = "invalid_recommended_image";
+      return result;
+    }
+    if (!view.fovValid) {
+      result.gate = "invalid_fov";
+      return result;
+    }
+    if (!(view.fov.angleLeft < 0.0f && view.fov.angleRight > 0.0f && view.fov.angleDown < 0.0f &&
+          view.fov.angleUp > 0.0f)) {
+      result.gate = "unexpected_fov_signs";
+      return result;
+    }
+
+    const float horizontal = view.fov.angleRight - view.fov.angleLeft;
+    const float vertical = view.fov.angleUp - view.fov.angleDown;
+    result.minHorizontalFovRadians = std::min(result.minHorizontalFovRadians, horizontal);
+    result.maxHorizontalFovRadians = std::max(result.maxHorizontalFovRadians, horizontal);
+    result.minVerticalFovRadians = std::min(result.minVerticalFovRadians, vertical);
+    result.maxVerticalFovRadians = std::max(result.maxVerticalFovRadians, vertical);
+    if (horizontal < 0.5f || horizontal > 3.2f || vertical < 0.5f || vertical > 3.2f) {
+      result.gate = "implausible_fov";
+      return result;
+    }
+  }
+
+  const float dx = sample.right.pose.position.x - sample.left.pose.position.x;
+  const float dy = sample.right.pose.position.y - sample.left.pose.position.y;
+  const float dz = sample.right.pose.position.z - sample.left.pose.position.z;
+  result.ipdMeters = std::sqrt(dx * dx + dy * dy + dz * dz);
+  if (result.ipdMeters < 0.03f || result.ipdMeters > 0.09f) {
+    result.gate = "implausible_ipd";
+    return result;
+  }
+
+  result.gate = "validated";
+  return result;
 }
 
 std::vector<uint8_t> render_head_motion_image(const HeadMotionSample& sample, uint32_t width, uint32_t height) {
@@ -385,7 +612,10 @@ int main(int argc, char* argv[]) {
   bool allowUnavailable = false;
   bool requireDawnInterop = false;
   bool exerciseEyes = false;
+  bool exerciseFlatUi = false;
+  bool exerciseHeadlessMirror = false;
   bool exerciseHeadMotion = false;
+  bool validateViewGeometry = false;
   std::filesystem::path headMotionImageDir;
   std::vector<char*> auroraArgv;
   auroraArgv.reserve(static_cast<size_t>(argc));
@@ -397,8 +627,14 @@ int main(int argc, char* argv[]) {
       requireDawnInterop = true;
     } else if (argv[i] != nullptr && std::string_view{argv[i]} == "--exercise-eye-targets") {
       exerciseEyes = true;
+    } else if (argv[i] != nullptr && std::string_view{argv[i]} == "--exercise-flat-ui-target") {
+      exerciseFlatUi = true;
+    } else if (argv[i] != nullptr && std::string_view{argv[i]} == "--exercise-headless-mirror-frame") {
+      exerciseHeadlessMirror = true;
     } else if (argv[i] != nullptr && std::string_view{argv[i]} == "--exercise-head-motion") {
       exerciseHeadMotion = true;
+    } else if (argv[i] != nullptr && std::string_view{argv[i]} == "--validate-view-geometry") {
+      validateViewGeometry = true;
     } else if (argv[i] != nullptr && std::string_view{argv[i]} == "--head-motion-image-dir" && i + 1 < argc) {
       headMotionImageDir = argv[++i];
     } else {
@@ -436,6 +672,9 @@ int main(int argc, char* argv[]) {
   std::printf("xr_message=%s\n", message != nullptr ? message : "");
   const char* dawnInterop = dawn_interop_status(message);
   std::printf("xr_dawn_interop=%s\n", dawnInterop);
+  const char* vulkanExtensionGate =
+      vulkan_extension_validation_status(aurora_xr_get_vulkan_extension_validation(), message);
+  std::printf("xr_vulkan_extension_gate=%s\n", vulkanExtensionGate);
   std::printf("xr_proof_gate=%s\n", proof_gate_status(status, message));
   std::printf("xr_view_count=%u\n", viewCount);
   for (uint32_t i = 0; i < viewCount; ++i) {
@@ -446,11 +685,36 @@ int main(int argc, char* argv[]) {
     }
   }
   const char* eyeTargetGate = "not_requested";
-  if (exerciseEyes) {
+  const char* flatUiTargetGate = "not_requested";
+  if (exerciseEyes && exerciseFlatUi) {
+    std::fflush(stdout);
+    if (proofSucceeded) {
+      const XrTargetExerciseResult targetResult = exercise_eye_and_flat_ui_targets(viewCount);
+      eyeTargetGate = targetResult.eyeGate;
+      flatUiTargetGate = targetResult.flatUiGate;
+    } else {
+      eyeTargetGate = "proof_not_cleared";
+      flatUiTargetGate = "proof_not_cleared";
+    }
+    std::printf("xr_eye_target_gate=%s\n", eyeTargetGate);
+    std::printf("xr_flat_ui_target_gate=%s\n", flatUiTargetGate);
+  } else if (exerciseEyes) {
     std::fflush(stdout);
     eyeTargetGate = proofSucceeded ? exercise_eye_targets(viewCount) : "proof_not_cleared";
     std::printf("xr_eye_target_gate=%s\n", eyeTargetGate);
-    std::printf("xr_live_gate=%s_%s\n", proof_gate_status(status, message), eyeTargetGate);
+  } else if (exerciseFlatUi) {
+    std::fflush(stdout);
+    flatUiTargetGate = proofSucceeded ? exercise_flat_ui_target() : "proof_not_cleared";
+    std::printf("xr_flat_ui_target_gate=%s\n", flatUiTargetGate);
+  }
+  if (exerciseEyes || exerciseFlatUi) {
+    std::printf("xr_live_gate=%s_%s_flat_ui_%s\n", proof_gate_status(status, message), eyeTargetGate, flatUiTargetGate);
+  }
+  const char* headlessMirrorGate = "not_requested";
+  if (exerciseHeadlessMirror) {
+    std::fflush(stdout);
+    headlessMirrorGate = proofSucceeded ? exercise_headless_mirror_frame(viewCount) : "proof_not_cleared";
+    std::printf("xr_headless_mirror_gate=%s\n", headlessMirrorGate);
   }
   HeadMotionResult headMotionResult{};
   if (exerciseHeadMotion) {
@@ -469,11 +733,30 @@ int main(int argc, char* argv[]) {
     std::printf("xr_head_motion_last_image=%s\n", headMotionResult.lastImage.string().c_str());
     std::printf("xr_head_motion_delta_image=%s\n", headMotionResult.deltaImage.string().c_str());
   }
+  ViewGeometryResult viewGeometryResult{};
+  if (validateViewGeometry) {
+    std::fflush(stdout);
+    viewGeometryResult = proofSucceeded ? validate_view_geometry(viewCount) : ViewGeometryResult{.gate = "proof_not_cleared"};
+    std::printf("xr_view_geometry_gate=%s\n", viewGeometryResult.gate);
+    std::printf("xr_view_geometry_min_horizontal_fov_rad=%.4f\n", viewGeometryResult.minHorizontalFovRadians);
+    std::printf("xr_view_geometry_max_horizontal_fov_rad=%.4f\n", viewGeometryResult.maxHorizontalFovRadians);
+    std::printf("xr_view_geometry_min_vertical_fov_rad=%.4f\n", viewGeometryResult.minVerticalFovRadians);
+    std::printf("xr_view_geometry_max_vertical_fov_rad=%.4f\n", viewGeometryResult.maxVerticalFovRadians);
+    std::printf("xr_view_geometry_ipd_m=%.4f\n", viewGeometryResult.ipdMeters);
+  }
 
   const bool smokeSatisfied = allowUnavailable && is_unavailable_or_blocked(status);
   const bool dawnInteropSatisfied = !requireDawnInterop || std::string_view{dawnInterop} == "ready";
   const bool eyeTargetsSatisfied = !exerciseEyes || std::string_view{eyeTargetGate} == "submitted";
+  const bool flatUiTargetSatisfied = !exerciseFlatUi || std::string_view{flatUiTargetGate} == "submitted";
+  const bool headlessMirrorSatisfied =
+      !exerciseHeadlessMirror || std::string_view{headlessMirrorGate} == "continued";
   const bool headMotionSatisfied = !exerciseHeadMotion || std::string_view{headMotionResult.gate} == "validated";
+  const bool viewGeometrySatisfied = !validateViewGeometry || std::string_view{viewGeometryResult.gate} == "validated";
   aurora_shutdown();
-  return dawnInteropSatisfied && eyeTargetsSatisfied && headMotionSatisfied && (proofSucceeded || smokeSatisfied) ? 0 : 2;
+  return dawnInteropSatisfied && eyeTargetsSatisfied && flatUiTargetSatisfied && headlessMirrorSatisfied &&
+                 headMotionSatisfied && viewGeometrySatisfied &&
+                 (proofSucceeded || smokeSatisfied)
+             ? 0
+             : 2;
 }

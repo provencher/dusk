@@ -11105,9 +11105,7 @@ static void view_setup(camera_process_class* i_this) {
 
     f32 cullFovy = view->fovy;
 #if TARGET_PC
-    if (dusk::vr::active() && cullFovy < 120.0f) {
-        cullFovy = 120.0f;
-    }
+    cullFovy = dusk::vr::conservative_culling_fovy(cullFovy);
 #endif
     mDoLib_clipper::setup(cullFovy, view->aspect, view->near_, far_);
 }

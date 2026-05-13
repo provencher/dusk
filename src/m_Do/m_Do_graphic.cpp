@@ -283,6 +283,73 @@ ResTIMG* mDoGph_gInf_c::mZbufferTimg;
 
 void* mDoGph_gInf_c::mZbufferTex;
 
+#if TARGET_PC
+static int getActiveXrCaptureEyeIndex() {
+    const int eyeIndex = dusk::vr::current_eye_index();
+    return eyeIndex >= 0 && eyeIndex < 2 ? eyeIndex : -1;
+}
+#endif
+
+ResTIMG* mDoGph_gInf_c::getFrameBufferTimg() {
+#if TARGET_PC
+    const int eyeIndex = getActiveXrCaptureEyeIndex();
+    if (eyeIndex >= 0 && mXrEyeFrameBufferTimg[eyeIndex] != nullptr) {
+        return mXrEyeFrameBufferTimg[eyeIndex];
+    }
+#endif
+    return mFrameBufferTimg;
+}
+
+ResTIMG* mDoGph_gInf_c::getZbufferTimg() {
+#if TARGET_PC
+    const int eyeIndex = getActiveXrCaptureEyeIndex();
+    if (eyeIndex >= 0 && mXrEyeZbufferTimg[eyeIndex] != nullptr) {
+        return mXrEyeZbufferTimg[eyeIndex];
+    }
+#endif
+    return mZbufferTimg;
+}
+
+void* mDoGph_gInf_c::getFrameBufferTex() {
+#if TARGET_PC
+    const int eyeIndex = getActiveXrCaptureEyeIndex();
+    if (eyeIndex >= 0 && mXrEyeFrameBufferTex[eyeIndex] != nullptr) {
+        return mXrEyeFrameBufferTex[eyeIndex];
+    }
+#endif
+    return mFrameBufferTex;
+}
+
+void* mDoGph_gInf_c::getZbufferTex() {
+#if TARGET_PC
+    const int eyeIndex = getActiveXrCaptureEyeIndex();
+    if (eyeIndex >= 0 && mXrEyeZbufferTex[eyeIndex] != nullptr) {
+        return mXrEyeZbufferTex[eyeIndex];
+    }
+#endif
+    return mZbufferTex;
+}
+
+TGXTexObj* mDoGph_gInf_c::getFrameBufferTexObj() {
+#if TARGET_PC
+    const int eyeIndex = getActiveXrCaptureEyeIndex();
+    if (eyeIndex >= 0) {
+        return &mXrEyeFrameBufferTexObj[eyeIndex];
+    }
+#endif
+    return &mFrameBufferTexObj;
+}
+
+TGXTexObj* mDoGph_gInf_c::getZbufferTexObj() {
+#if TARGET_PC
+    const int eyeIndex = getActiveXrCaptureEyeIndex();
+    if (eyeIndex >= 0) {
+        return &mXrEyeZbufferTexObj[eyeIndex];
+    }
+#endif
+    return &mZbufferTexObj;
+}
+
 f32 mDoGph_gInf_c::mFadeRate;
 
 f32 mDoGph_gInf_c::mFadeSpeed;
@@ -337,6 +404,18 @@ void mDoGph_gInf_c::create() {
     mZbufferTimg = createTimg(FB_WIDTH / 2, FB_HEIGHT / 2, GX_TF_IA8);
     JUT_ASSERT(381, mZbufferTimg != NULL);
     mZbufferTex = (char*)mZbufferTimg + sizeof(ResTIMG);
+
+#if TARGET_PC
+    for (int eyeIndex = 0; eyeIndex < 2; ++eyeIndex) {
+        mXrEyeFrameBufferTimg[eyeIndex] = createTimg(FB_WIDTH / 2, FB_HEIGHT / 2, GX_TF_RGBA8);
+        JUT_ASSERT(386, mXrEyeFrameBufferTimg[eyeIndex] != NULL);
+        mXrEyeFrameBufferTex[eyeIndex] = (char*)mXrEyeFrameBufferTimg[eyeIndex] + sizeof(ResTIMG);
+
+        mXrEyeZbufferTimg[eyeIndex] = createTimg(FB_WIDTH / 2, FB_HEIGHT / 2, GX_TF_IA8);
+        JUT_ASSERT(390, mXrEyeZbufferTimg[eyeIndex] != NULL);
+        mXrEyeZbufferTex[eyeIndex] = (char*)mXrEyeZbufferTimg[eyeIndex] + sizeof(ResTIMG);
+    }
+#endif
 
     J2DPrint::setBuffer(0x400);
     mBlureFlag = false;
@@ -408,6 +487,15 @@ TGXTexObj mDoGph_gInf_c::m_fullFrameBufferTexObj;
 TGXTexObj mDoGph_gInf_c::mFrameBufferTexObj;
 
 TGXTexObj mDoGph_gInf_c::mZbufferTexObj;
+
+#if TARGET_PC
+TGXTexObj mDoGph_gInf_c::mXrEyeFrameBufferTexObj[2];
+TGXTexObj mDoGph_gInf_c::mXrEyeZbufferTexObj[2];
+ResTIMG* mDoGph_gInf_c::mXrEyeFrameBufferTimg[2];
+void* mDoGph_gInf_c::mXrEyeFrameBufferTex[2];
+ResTIMG* mDoGph_gInf_c::mXrEyeZbufferTimg[2];
+void* mDoGph_gInf_c::mXrEyeZbufferTex[2];
+#endif
 
 mDoGph_gInf_c::bloom_c mDoGph_gInf_c::m_bloom;
 
@@ -2119,6 +2207,42 @@ int mDoGph_Painter() {
     GX_DEBUG_GROUP(dComIfGd_drawCopy2D);
 
     bool renderedXrStereoWorld = false;
+    camera_process_class* flatCompositionCamera = nullptr;
+    view_port_class* flatCompositionViewPort = nullptr;
+    view_port_class flatCompositionViewPortStorage{};
+
+    auto draw_flat_composition_post_effects_section = [&]() {
+        if (flatCompositionCamera == nullptr || flatCompositionViewPort == nullptr) {
+            return;
+        }
+
+        if (fapGmHIO_getParticle()) {
+            #if WIDESCREEN_SUPPORT
+            if (mDoGph_gInf_c::isWideZoom()) {
+                ortho.setOrtho(0.0f, 0.0f, FB_WIDTH_BASE, FB_HEIGHT_BASE, 100000.0f, -100000.0f);
+            } else
+            #endif
+            {
+                ortho.setOrtho(mDoGph_gInf_c::getMinXF(), mDoGph_gInf_c::getMinYF(),
+                               mDoGph_gInf_c::getWidthF(), mDoGph_gInf_c::getHeightF(),
+                               100000.0f, -100000.0f);
+            }
+            ortho.setPort();
+
+            Mtx m3;
+            MTXTrans(m3, FB_WIDTH_BASE / 2, FB_HEIGHT_BASE / 2, 0.0f);
+            JPADrawInfo draw_info2(m3, 0.0f, FB_HEIGHT_BASE, 0.0f, FB_WIDTH_BASE);
+            dComIfGp_particle_draw2Dgame(&draw_info2);
+        }
+
+        trimming(&flatCompositionCamera->view, flatCompositionViewPort);
+
+        if (strcmp(dComIfGp_getStartStageName(), "F_SP127") != 0 &&
+            (mDoGph_gInf_c::isFade() & 0x80) == 0)
+        {
+            mDoGph_gInf_c::calcFade();
+        }
+    };
 
     #if DEBUG
     // "↓↓↓↓↓↓↓↓↓↓ CPU time measuring start ↓↓↓↓↓↓↓↓↓↓"
@@ -2150,17 +2274,18 @@ int mDoGph_Painter() {
             view_port_class* view_port = window_p->getViewPort();
 
             if (view_port->x_orig != 0.0f || view_port->y_orig != 0.0f) {
-                view_port_class new_port;
-                new_port.x_orig = 0.0f;
-                new_port.y_orig = 0.0f;
-                new_port.width = FB_WIDTH;
-                new_port.height = FB_HEIGHT;
-                new_port.near_z = view_port->near_z;
-                new_port.far_z = view_port->far_z;
-                new_port.scissor = view_port->scissor;
+                flatCompositionViewPortStorage.x_orig = 0.0f;
+                flatCompositionViewPortStorage.y_orig = 0.0f;
+                flatCompositionViewPortStorage.width = FB_WIDTH;
+                flatCompositionViewPortStorage.height = FB_HEIGHT;
+                flatCompositionViewPortStorage.near_z = view_port->near_z;
+                flatCompositionViewPortStorage.far_z = view_port->far_z;
+                flatCompositionViewPortStorage.scissor = view_port->scissor;
 
-                view_port = &new_port;
+                view_port = &flatCompositionViewPortStorage;
             }
+            flatCompositionCamera = camera_p;
+            flatCompositionViewPort = view_port;
 
             #if DEBUG
             captureScreenSetScissor(&view_port->scissor);
@@ -2378,7 +2503,7 @@ int mDoGph_Painter() {
 #endif
             };
 
-            auto draw_mono_screen_space_post_effects_section = [&]() {
+            auto draw_mono_screen_space_post_effects_section = [&](bool includeFlatCompositionTail) {
             if (!dComIfGp_isPauseFlag()) {
                 #if DEBUG
                 fapGm_HIO_c::startCpuTimer();
@@ -2589,31 +2714,8 @@ int mDoGph_Painter() {
                 fapGm_HIO_c::startCpuTimer();
                 #endif
 
-                if (fapGmHIO_getParticle()) {
-                    #if WIDESCREEN_SUPPORT
-                    if (mDoGph_gInf_c::isWideZoom()) {
-                        ortho.setOrtho(0.0f, 0.0f, FB_WIDTH_BASE, FB_HEIGHT_BASE, 100000.0f, -100000.0f);
-                    } else
-                    #endif
-                    {
-                        ortho.setOrtho(mDoGph_gInf_c::getMinXF(), mDoGph_gInf_c::getMinYF(),
-                                       mDoGph_gInf_c::getWidthF(), mDoGph_gInf_c::getHeightF(),
-                                       100000.0f, -100000.0f);
-                    }
-                    ortho.setPort();
-
-                    Mtx m3;
-                    MTXTrans(m3, FB_WIDTH_BASE / 2, FB_HEIGHT_BASE / 2, 0.0f);
-                    JPADrawInfo draw_info2(m3, 0.0f, FB_HEIGHT_BASE, 0.0f, FB_WIDTH_BASE);
-                    dComIfGp_particle_draw2Dgame(&draw_info2);
-                }
-
-                trimming(&camera_p->view, view_port);
-
-                if (strcmp(dComIfGp_getStartStageName(), "F_SP127") != 0 &&
-                    (mDoGph_gInf_c::isFade() & 0x80) == 0)
-                {
-                    mDoGph_gInf_c::calcFade();
+                if (includeFlatCompositionTail) {
+                    draw_flat_composition_post_effects_section();
                 }
 
                 #if DEBUG
@@ -2638,6 +2740,7 @@ int mDoGph_Painter() {
                         apply_active_camera_section();
                         draw_world_3d_section();
                         draw_world_projected_2d_section();
+                        draw_mono_screen_space_post_effects_section(false);
                         drewXrEye = true;
                     }
                     dusk::vr::end_eye_view(eyeToken);
@@ -2652,12 +2755,12 @@ int mDoGph_Painter() {
             if (!drewXrEye) {
                 prepare_world_3d_once_section();
                 draw_world_3d_section();
-                draw_mono_screen_space_post_effects_section();
+                draw_mono_screen_space_post_effects_section(true);
             }
 #else
             prepare_world_3d_once_section();
             draw_world_3d_section();
-            draw_mono_screen_space_post_effects_section();
+            draw_mono_screen_space_post_effects_section(true);
 #endif
         }
     }
@@ -2734,11 +2837,27 @@ int mDoGph_Painter() {
     #endif
 
 #if TARGET_PC
-    const bool drawFlat2D = !renderedXrStereoWorld && fapGmHIO_get2Ddraw();
+    const bool drawFlat2D = fapGmHIO_get2Ddraw();
+    bool xrFlatUiTargetActive = false;
+    bool drewFlat2DSection = false;
+    if (renderedXrStereoWorld && flatCompositionCamera != nullptr) {
+        xrFlatUiTargetActive = aurora_xr_begin_flat_ui();
+        if (xrFlatUiTargetActive) {
+            draw_flat_composition_post_effects_section();
+            ortho.setPort();
+        }
+    }
 #else
     const bool drawFlat2D = fapGmHIO_get2Ddraw();
 #endif
-    if (drawFlat2D) {
+    if (drawFlat2D
+#if TARGET_PC
+        && (!renderedXrStereoWorld || xrFlatUiTargetActive)
+#endif
+    ) {
+#if TARGET_PC
+        drewFlat2DSection = true;
+#endif
         Mtx m4;
         cMtx_copy(j3dSys.getViewMtx(), m4);
 
@@ -2792,7 +2911,17 @@ int mDoGph_Painter() {
         j3dSys.setViewMtx(m4);
     }
 #if TARGET_PC
-    else if (!renderedXrStereoWorld)
+    const bool needsSpecialFadePass =
+        strcmp(dComIfGp_getStartStageName(), "F_SP127") == 0 || (mDoGph_gInf_c::isFade() & 0x80) != 0;
+    if (xrFlatUiTargetActive && !drewFlat2DSection && needsSpecialFadePass) {
+        mDoGph_gInf_c::calcFade();
+    }
+    if (xrFlatUiTargetActive) {
+        aurora_xr_end_flat_ui();
+    }
+#endif
+#if TARGET_PC
+    if (!drewFlat2DSection && !renderedXrStereoWorld)
 #else
     else
 #endif
@@ -2820,7 +2949,7 @@ int mDoGph_Painter() {
     }
 
 #if TARGET_PC
-    else if (strcmp(dComIfGp_getStartStageName(), "F_SP127") == 0 || (mDoGph_gInf_c::isFade() & 0x80) != 0)
+    else if (!renderedXrStereoWorld && needsSpecialFadePass)
     {
         mDoGph_gInf_c::calcFade();
     }

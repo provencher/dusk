@@ -32,18 +32,20 @@ This plan has been revalidated against the local branch delta `ZX` (`dc1365b1b5`
 - Dusk startup accepts `READY` or `ACTIVE` for Required mode in `src/m_Do/m_Do_main.cpp:439`.
 - Dusk passes configurable OpenXR eye dimensions to Aurora from `src/m_Do/m_Do_main.cpp:764`; settings defaults are in `include/dusk/settings.h:199` and `src/dusk/settings.cpp:123`.
 - Dusk already runs the stereo world loop: `aurora_xr_begin_eye()`, `dusk::vr::begin_eye_view()`, world draw, world-projected 2D draw, restore, and `aurora_xr_end_eye()` in `src/m_Do/m_Do_graphic.cpp:2626`.
-- Mock-HMD/no-headset validation exists through `tools/openxr_probe_main.cpp` and the `dusk_openxr_probe` CTest targets in `CMakeLists.txt:550`.
+- Aurora now owns a `VIEW`-space flat UI swapchain and submits it as an `XrCompositionLayerQuad` when flat UI content is rendered.
+- Native game HUD/menu drawing, RmlUi, and ImGui can render into the OpenXR flat UI target after stereo world rendering.
+- XR frame progression is no longer tied to successful mirror surface acquisition, and the default mirror composites eye 0 plus the flat UI layer when available. Side-by-side debug mirror remains available with `AURORA_XR_MIRROR_SBS=1`.
+- Dusk uses `dusk::vr::conservative_culling_fovy()` for XR culling instead of a hardcoded widening.
+- Mock-HMD/no-headset validation exists through `tools/openxr_probe_main.cpp` and the `dusk_openxr_probe` CTest targets in `CMakeLists.txt:550`, including target submission, flat UI submission, simulated mirror-surface loss, simulated head motion, and view-geometry gates.
 
 ### Still Missing / Incomplete
-- `aurora_xr_begin_flat_ui()` is still a stub and returns false in `extern/aurora/lib/xr/xr.cpp:930`; there is no flat UI swapchain, `VIEW` space, or `XrCompositionLayerQuad` path.
-- Native game 2D/HUD/menu drawing is skipped after XR stereo world rendering: `drawFlat2D = !renderedXrStereoWorld && ...` in `src/m_Do/m_Do_graphic.cpp:2736`.
-- Mono screen-space post effects are still skipped whenever an XR eye rendered; the fallback-only mono post call is in `src/m_Do/m_Do_graphic.cpp:2652`.
-- RmlUi and ImGui render to the window/mirror path, not an HMD flat UI layer.
-- The mirror path is debug SBS/eye-preview oriented, not the final eye-0-plus-flat-UI composited mirror.
-- `aurora::begin_frame()` can still reject the whole frame before XR begins when the mirror/window surface is unavailable.
-- Culling still uses the hardcoded XR widening in `src/d/d_camera.cpp:11106` instead of a Dusk VR helper based on the current eye FOV/pose envelope.
-- Only the first world-projected reticle conversions are in place; the full `mDoLib_project()` / `mDoLib_pos2camera()` / marker-packet audit remains open.
-- Current validation proves target lifetime and mock-HMD plumbing, not real headset visual correctness, comfort, or game parity.
+- Physical headset validation is still required on a real Windows OpenXR runtime.
+- Representative scene validation is still required for water/refraction, bloom, darkworld/filter effects, fade/wipe/trimming ordering, late particles, camera-dependent particles, recenter/IPD/FOV comfort, and mirror-window resilience.
+- Motion blur runs in the XR per-eye post pass using the active eye's framebuffer capture scratch texture as its isolated history. It still needs representative scene and comfort validation on a headset.
+- The current post-effect call classification is documented in `docs/plans/vr-post-effects-audit-2026-05-12.md`.
+- World-projected player sight and boomerang lock cursors are converted, and the broader projection-call audit is documented, but ambiguous actor/effect projection helpers still need scene validation before further conversion.
+- Current automated validation proves target lifetime, same-frame eye plus flat-UI acquisition, simulated 6DoF/view geometry, queue release ordering, and build coverage. It does not prove real headset display quality, comfort, compositor behavior, or game-scene parity.
+- Do not mark this plan complete until `docs/plans/vr-physical-validation-matrix-2026-05-12.md` contains completed physical runtime rows, representative scene rows, and any known-deviation entries found during that testing.
 
 ## Approach
 1. **Do not rebuild the solved bridge.** Treat Aurora runtime, patched-Dawn direct `VkImage` wrapping, EFB target overrides, and functional eye targets as implemented on `xrDev`, pending real-headset validation.
@@ -55,11 +57,14 @@ This plan has been revalidated against the local branch delta `ZX` (`dc1365b1b5`
 ## Remaining Work Items
 
 ### 1. Validate the implemented eye path on real Windows OpenXR runtimes
+- Current implementation note: the patched-Dawn Windows build compiles and the Monado simulated-HMD/null-compositor OpenXR CTest suite currently passes 6/6 with `xr_live_gate=cleared_submitted_flat_ui_submitted`, `xr_vulkan_extension_gate=validated`, `xr_headless_mirror_gate=continued`, `xr_head_motion_gate=validated`, and `xr_view_geometry_gate=validated`. This automated validation covers target lifetime, same-frame eye plus flat-UI acquisition, runtime Vulkan extension compatibility, simulated mirror-surface loss, simulated 6DoF plumbing, and OpenXR view-geometry sanity, but it does not satisfy the physical-headset requirement below.
+- Physical headset validation is tracked in `docs/plans/vr-physical-validation-matrix-2026-05-12.md`.
+- Current completion status is tracked in `docs/plans/complete-vr-implementation-audit-2026-05-12.md`.
 - Test with a physical headset/runtime, not just Monado/null-compositor mock validation.
 - Confirm the required build flags and provider path are documented and reproducible: `AURORA_ENABLE_OPENXR=ON`, Vulkan backend, vendored Dawn, `AURORA_DAWN_APPLY_OPENXR_PATCH=ON`, and `AURORA_DAWN_OPENXR_HANDLES` defined.
 - Verify direct image wrapping works on the target runtime without adding a copy/intermediate path.
-- Check `xrGetVulkanInstanceExtensions2KHR` / `xrGetVulkanDeviceExtensions2KHR` requirements against the Dawn-created Vulkan instance/device; add explicit validation or extension plumbing if the runtime requires it.
-- Audit queue ownership/synchronization around OpenXR calls that may touch the Vulkan queue; current release ordering is after submit and before `xrEndFrame()`, but explicit queue synchronization policy still needs validation.
+- Runtime-required Vulkan instance/device extension strings from `xrGetVulkanInstanceExtensionsKHR` / `xrGetVulkanDeviceExtensionsKHR` are explicitly checked against the active Vulkan loader and Dawn-selected physical device before session creation. Missing or unqueryable requirements map to `BLOCKED` with actionable logging, and `aurora_xr_get_vulkan_extension_validation()` exposes a typed diagnostic consumed by the OpenXR probe's `xr_vulkan_extension_gate=` output. The OpenXR session/device path remains `XR_KHR_vulkan_enable2`.
+- Queue ownership/synchronization policy: after WebGPU submission and before releasing any acquired OpenXR eye or flat-UI swapchain image, Aurora waits for Dawn's Vulkan queue to become idle through the patched-Dawn queue handle. This is conservative and validated by the Monado simulated-HMD OpenXR CTest suite; a lower-latency semaphore/fence handoff can replace it later only with runtime validation.
 
 Validation:
 - SteamVR/Meta/WMR target runtime reaches `READY` then `ACTIVE`.
@@ -101,6 +106,10 @@ Validation:
 - RmlUi/ImGui still render normally in flat mode.
 
 ### 5. Split and port post effects for stereo parity
+- Current implementation note: ordinary 2D-game particles, `trimming()`, and the normal `calcFade()` overlay path are factored into a flat-composition helper and run inside the OpenXR flat UI target when stereo world rendering succeeds. The world/depth-dependent portions of the old mono post block still require scene validation and finer-grained per-eye treatment.
+- Current implementation note: special `F_SP127` / `0x80` fade overlays are also kept inside the XR flat UI target when stereo world rendering succeeds, even if the debug 2D draw toggle disables the normal flat 2D section.
+- Current implementation note: framebuffer and depth capture scratch textures used by motion blur, depth-of-field, bloom, indirect-screen, and repeated capture passes are selected per active XR eye, preventing the second eye from overwriting the first eye's capture intermediates during the same frame.
+- Current implementation note: `docs/plans/vr-post-effects-audit-2026-05-12.md` maps the current mono post-effect calls to per-eye world/depth work, flat composition work, or still-unvalidated scene cases.
 - Split `draw_mono_screen_space_post_effects_section()` into stereo per-eye work and flat composition work.
 - Run world/depth-dependent effects per eye: depth-of-field, bloom, filters, darkworld/invisible/refraction lists, late 3D lists, and particles that depend on the active camera.
 - Eye-index stateful resources such as motion blur history, framebuffer captures, depth captures, and indirect-screen intermediates.
@@ -113,7 +122,9 @@ Validation:
 - Flat mode order and visuals remain unchanged.
 
 ### 6. Make mirror/window lifecycle HMD-safe
+- Current implementation note: `dusk_openxr_probe --exercise-headless-mirror-frame` now simulates an unavailable native presentation surface via `aurora_debug_set_surface_ready(false)` and reports `xr_headless_mirror_gate=continued` only after both eyes and the flat UI target submit successfully without a mirror surface. The live CTest registration `dusk_openxr_probe_headless_mirror` currently passes under the Monado simulated-HMD/null-compositor setup.
 - Let XR frame progression continue when the mirror window is minimized, paused, or cannot acquire a surface; flat-only mode can keep today's stricter behavior.
+- Active XR event polling is non-blocking while XR remains active/renderable, so a paused or unavailable mirror surface cannot stall frame progression before the next `xrWaitFrame()`/submit cycle.
 - Keep the existing SBS mirror as a debug option, but add a default mirror preview that blits/samples eye 0 plus flat UI when possible.
 - If mirror sampling is unavailable, log once and skip mirror preview rather than adding a copy-only mirror path.
 
@@ -136,7 +147,7 @@ Validation:
 ### 8. Finish world-projected UI audit
 - Search `mDoLib_project(`, `mDoLib_pos2camera(`, `dComIfGd_set2DXlu(`, and cursor/marker packets that store world positions.
 - Convert world-attached markers to `dComIfGd_setWorldProjected2DXlu()` and recompute projection in draw-time XR context.
-- Decide whether `WorldProjectedItem::modelFromWorld` should be applied during draw or removed if unused; it is currently stored but the draw loop calls only `item.drawList->draw()`.
+- Current implementation note: `WorldProjectedItem::modelFromWorld` was removed because no caller supplied a non-identity model matrix and the draw loop only invokes each packet's `draw()`. World-attached packets that need per-eye placement should recompute projection during `draw()` from their stored world position.
 - Leave pure HUD/menu elements in the flat UI layer.
 - Document ambiguous call sites until tested.
 
@@ -146,9 +157,15 @@ Validation:
 - Menus/HUD do not become erroneous stereo world markers.
 
 ### 9. Update docs, settings text, and validation matrix
+- Current implementation note: Windows build validation now includes the default prebuilt-Dawn OpenXR probe path, the patched-Dawn Monado simulated-HMD path, and the `windows-msvc-no-openxr` preset with `AURORA_ENABLE_OPENXR=OFF`.
+- Current implementation note: the patched-Dawn Monado simulated-HMD validation path now checks OpenXR view geometry in addition to target submission and head motion: per-eye FOV signs/ranges, recommended image metadata, and stereo eye separation/IPD plausibility.
+- Current implementation note: every OpenXR probe CTest has an explicit timeout so unavailable, blocked, or wedged runtime paths fail boundedly instead of hanging validation.
 - Update `docs/building.md` and `src/dusk/ui/settings.cpp` so they no longer claim eye swapchain interop is wholly missing; distinguish implemented patched-Dawn eye rendering from remaining flat UI/post-effect limitations.
 - Document the no-headset Monado/mock-HMD validation path and its limits: it proves target lifetime/submission plumbing, not real headset display quality.
-- Document the physical headset validation matrix and known VR deviations.
+- Document the physical headset validation matrix and known VR deviations in `docs/plans/vr-physical-validation-matrix-2026-05-12.md`.
+- Record any scene-tested intentional VR deviations in the validation matrix's
+  known-deviations log with the runtime/headset, scene, observed behavior,
+  reason, and follow-up.
 
 Validation:
 - Settings text matches current behavior.
@@ -163,6 +180,9 @@ Validation:
 - `docs/plans/openxr-launch-2026-05-11.md`
 - `docs/plans/openxr-windows-carry-home-2026-05-11.md`
 - `docs/plans/openxr-dawn-interop-decision-2026-05-11.md`
+- `docs/plans/complete-vr-implementation-audit-2026-05-12.md`
+- `docs/plans/vr-post-effects-audit-2026-05-12.md`
+- `docs/plans/vr-physical-validation-matrix-2026-05-12.md`
 - `docs/reviews/complete-vr-implementation-plan-critique-2026-05-12.md`
 - Khronos OpenXR 1.1.59 specification: https://registry.khronos.org/OpenXR/specs/1.1/html/xrspec.html
 - `XrGraphicsBindingVulkanKHR`: https://registry.khronos.org/OpenXR/specs/1.1/man/html/XrGraphicsBindingVulkanKHR.html
