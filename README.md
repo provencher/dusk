@@ -14,6 +14,29 @@ Dusk is a reverse-engineered reimplementation of Twilight Princess.
 
 It aims to be as accurate as possible to the original while also providing new options, enhancements, and tools to customize your experience.
 
+# OpenXR Development Build
+
+This checkout is currently used for the Windows OpenXR/VR work. The VR path uses
+the patched Dawn/OpenXR build preset and launches Dusk through Vulkan with
+OpenXR required.
+
+On Windows, use the local VR launcher:
+
+```bat
+.\run-dusk-vr.bat
+```
+
+The launcher lives at `run-dusk-vr.bat`. It runs
+`build\windows-msvc-dawn-vendor-openxr\dusk.exe` with
+`--backend vulkan --cvar backend.xrMode=2`, passes `game.ciso`, and defaults
+`XR_RUNTIME_JSON` to SteamVR's OpenXR runtime when that manifest is installed.
+
+For the normal non-VR launcher, use:
+
+```bat
+.\run-dusk.bat
+```
+
 # Setup
 
 > [!IMPORTANT]
