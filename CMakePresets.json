@@ -72,31 +72,6 @@
       ]
     },
     {
-      "name": "linux-default-relwithdebinfo-openxr",
-      "displayName": "Linux (default, vendored Dawn OpenXR)",
-      "binaryDir": "${sourceDir}/build/${presetName}",
-      "inherits": [
-        "relwithdebinfo",
-        "linux-default"
-      ],
-      "cacheVariables": {
-        "AURORA_ENABLE_OPENXR": {
-          "type": "BOOL",
-          "value": true
-        },
-        "AURORA_FETCH_OPENXR_SDK": {
-          "type": "BOOL",
-          "value": true
-        },
-        "AURORA_DAWN_PROVIDER": "vendor",
-        "AURORA_DAWN_LINKAGE": "static",
-        "AURORA_DAWN_APPLY_OPENXR_PATCH": {
-          "type": "BOOL",
-          "value": true
-        }
-      }
-    },
-    {
       "name": "linux-clang",
       "displayName": "Linux (Clang)",
       "inherits": [
@@ -620,12 +595,6 @@
       "configurePreset": "linux-default-relwithdebinfo",
       "description": "Linux (default) release build with debug info",
       "displayName": "Linux (default) RelWithDebInfo"
-    },
-    {
-      "name": "linux-default-relwithdebinfo-openxr",
-      "configurePreset": "linux-default-relwithdebinfo-openxr",
-      "description": "Linux vendored Dawn OpenXR build with debug info",
-      "displayName": "Linux (default, vendored Dawn OpenXR)"
     },
     {
       "name": "linux-clang-debug",
