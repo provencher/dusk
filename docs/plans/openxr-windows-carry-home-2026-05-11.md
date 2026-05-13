@@ -209,7 +209,7 @@ Confirm the Windows machine can build the current scaffold with OpenXR enabled a
 Use the Windows setup documented in `AGENTS.md`:
 
 - Repo:
-  - `C:\Users\eprov\OneDrive\Documentos\git\dusk`
+  - `<repo>`
 - VS dev shell:
   - `C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat`
 - Preset:
@@ -227,17 +227,17 @@ Use the Windows setup documented in `AGENTS.md`:
 From PowerShell or `cmd.exe`:
 
 ```bat
-cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d C:\Users\eprov\OneDrive\Documentos\git\dusk && cmake --preset windows-msvc-relwithdebinfo -DAURORA_ENABLE_OPENXR=ON"
+cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d <repo> && cmake --preset windows-msvc-relwithdebinfo -DAURORA_ENABLE_OPENXR=ON"
 ```
 
 ```bat
-cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d C:\Users\eprov\OneDrive\Documentos\git\dusk && cmake --build --preset windows-msvc-relwithdebinfo"
+cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d <repo> && cmake --build --preset windows-msvc-relwithdebinfo"
 ```
 
 Flat Vulkan smoke test:
 
 ```bat
-cd /d C:\Users\eprov\OneDrive\Documentos\git\dusk
+cd /d <repo>
 .\build\windows-msvc-relwithdebinfo\dusk.exe --backend vulkan .\game.ciso
 ```
 
@@ -506,13 +506,13 @@ This is a hard decision gate before implementing the render bridge.
 Configure with prebuilt Dawn first:
 
 ```bat
-cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d C:\Users\eprov\OneDrive\Documentos\git\dusk && cmake --preset windows-msvc-relwithdebinfo -DAURORA_ENABLE_OPENXR=ON -DAURORA_DAWN_PROVIDER=package"
+cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d <repo> && cmake --preset windows-msvc-relwithdebinfo -DAURORA_ENABLE_OPENXR=ON -DAURORA_DAWN_PROVIDER=package"
 ```
 
 If package headers do not expose required native APIs, configure vendor Dawn for source/header inspection:
 
 ```bat
-cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d C:\Users\eprov\OneDrive\Documentos\git\dusk && cmake --preset windows-msvc-relwithdebinfo -DAURORA_ENABLE_OPENXR=ON -DAURORA_DAWN_PROVIDER=vendor"
+cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d <repo> && cmake --preset windows-msvc-relwithdebinfo -DAURORA_ENABLE_OPENXR=ON -DAURORA_DAWN_PROVIDER=vendor"
 ```
 
 ### Decision gate 2
@@ -1288,17 +1288,17 @@ Commit only documentation if doing a planning-only change.
 Run:
 
 ```bat
-cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d C:\Users\eprov\OneDrive\Documentos\git\dusk && cmake --preset windows-msvc-relwithdebinfo -DAURORA_ENABLE_OPENXR=ON"
+cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d <repo> && cmake --preset windows-msvc-relwithdebinfo -DAURORA_ENABLE_OPENXR=ON"
 ```
 
 ```bat
-cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d C:\Users\eprov\OneDrive\Documentos\git\dusk && cmake --build --preset windows-msvc-relwithdebinfo"
+cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d <repo> && cmake --build --preset windows-msvc-relwithdebinfo"
 ```
 
 Validate flat Vulkan:
 
 ```bat
-cd /d C:\Users\eprov\OneDrive\Documentos\git\dusk
+cd /d <repo>
 .\build\windows-msvc-relwithdebinfo\dusk.exe --backend vulkan .\game.ciso
 ```
 
@@ -1529,7 +1529,7 @@ Validate whichever Phase 5 behavior was chosen:
 ### Final checks
 
 ```bat
-cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d C:\Users\eprov\OneDrive\Documentos\git\dusk && cmake --build --preset windows-msvc-relwithdebinfo"
+cmd.exe /c "call ""C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat"" -arch=x64 && cd /d <repo> && cmake --build --preset windows-msvc-relwithdebinfo"
 ```
 
 ```bat

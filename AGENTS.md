@@ -13,24 +13,14 @@ launchers and disc images untracked.
 This workspace has been set up and built on Windows using Visual Studio 2026
 Build Tools.
 
-Important local paths:
+Useful local paths:
 
-- Repo: `C:\Users\eprov\OneDrive\Documentos\git\dusk`
 - VS dev shell: `C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat`
-- 7-Zip: `C:\Program Files\7-Zip\7z.exe`
-- Local disc image: `C:\Users\eprov\OneDrive\Documentos\git\dusk\game.ciso`
-- Built executable: `C:\Users\eprov\OneDrive\Documentos\git\dusk\build\windows-msvc-relwithdebinfo\dusk.exe`
-- Local launcher: `C:\Users\eprov\OneDrive\Documentos\git\dusk\run-dusk.bat`
-
-`game.ciso` came from the user's legal dump archive:
-
-```powershell
-& "C:\Program Files\7-Zip\7z.exe" e "E:\Games\TwilightPrincess\Rom\Legend of Zelda, The - Twilight Princess (USA).7z" "Legend of Zelda, The - Twilight Princess (USA).ciso" -o"C:\Users\eprov\OneDrive\Documentos\git\dusk" -y
-Move-Item -LiteralPath "C:\Users\eprov\OneDrive\Documentos\git\dusk\Legend of Zelda, The - Twilight Princess (USA).ciso" -Destination "C:\Users\eprov\OneDrive\Documentos\git\dusk\game.ciso"
-```
+- Local disc image: `.\game.ciso` (untracked)
+- Built executable: `.\build\windows-msvc-relwithdebinfo\dusk.exe`
+- Local launcher: `.\run-dusk.bat`
 
 Dusk supports ISO/GCM/RVZ/WIA/WBFS/CISO/GCZ as runtime disc-image formats.
-The `.7z` archive itself is not passed to Dusk.
 
 ## Git And Submodules
 
@@ -38,7 +28,7 @@ Plain PowerShell may not have Git's Unix helper tools on PATH. Use Git Bash for
 submodule operations:
 
 ```powershell
-& "C:\Program Files\Git\bin\bash.exe" -lc "cd /c/Users/eprov/OneDrive/Documentos/git/dusk && git submodule update --init --recursive"
+& "C:\Program Files\Git\bin\bash.exe" -lc "git submodule update --init --recursive"
 ```
 
 The Aurora submodule should be checked out at `extern/aurora`.
@@ -89,28 +79,17 @@ working directory, so pass `game.ciso` explicitly or use `run-dusk.bat`.
 
 ## Local macOS Setup
 
-Important local paths:
+Useful local paths:
 
-- Repo: `/Users/pvncher/Documents/Git/dusk`
-- 7-Zip archive with the user's legal dump: `/Users/pvncher/Library/CloudStorage/GoogleDrive-eprovencher92@gmail.com/My Drive/Games/Roms/GC/Legend of Zelda, The - Twilight Princess (USA) NGC.7z`
-- Local disc image after extraction: `/Users/pvncher/Documents/Git/dusk/game.ciso`
-- Built app bundle: `/Users/pvncher/Documents/Git/dusk/build/macos-default-relwithdebinfo/Dusk.app`
-- App binary: `/Users/pvncher/Documents/Git/dusk/build/macos-default-relwithdebinfo/Dusk.app/Contents/MacOS/Dusk`
-- Local launcher: `/Users/pvncher/Documents/Git/dusk/run-dusk.sh`
+- Local disc image: `./game.ciso` (untracked)
+- Built app bundle: `./build/macos-default-relwithdebinfo/Dusk.app`
+- App binary: `./build/macos-default-relwithdebinfo/Dusk.app/Contents/MacOS/Dusk`
+- Local launcher: `./run-dusk.sh`
 
 Install local build prerequisites with Homebrew if needed:
 
 ```sh
 brew install cmake ninja p7zip
-```
-
-Extract the local disc image from the user's legal archive with:
-
-```sh
-7z e "/Users/pvncher/Library/CloudStorage/GoogleDrive-eprovencher92@gmail.com/My Drive/Games/Roms/GC/Legend of Zelda, The - Twilight Princess (USA) NGC.7z" \
-  "Legend of Zelda, The - Twilight Princess (USA).ciso" -o"/Users/pvncher/Documents/Git/dusk" -y
-mv "/Users/pvncher/Documents/Git/dusk/Legend of Zelda, The - Twilight Princess (USA).ciso" \
-  "/Users/pvncher/Documents/Git/dusk/game.ciso"
 ```
 
 Configure and build on macOS with:
