@@ -11,7 +11,7 @@ STEAMVR_RUNTIME="$HOME/.local/share/Steam/steamapps/common/SteamVR/steamxr_linux
 if [[ ! -x "$DUSK_EXE" ]]; then
     echo "Dusk OpenXR executable not found: $DUSK_EXE"
     echo "Build it with:"
-    echo "  cmake --build --preset linux-default-relwithdebinfo --target dusk"
+    echo "  cmake --build --preset linux-clang-relwithdebinfo-openxr --target dusk"
     exit 1
 fi
 
