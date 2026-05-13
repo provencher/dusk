@@ -99,6 +99,33 @@
       ]
     },
     {
+      "name": "linux-clang-relwithdebinfo-openxr",
+      "displayName": "Linux (Clang, vendored Dawn OpenXR)",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "inherits": [
+        "relwithdebinfo",
+        "linux-default"
+      ],
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "AURORA_ENABLE_OPENXR": {
+          "type": "BOOL",
+          "value": true
+        },
+        "AURORA_FETCH_OPENXR_SDK": {
+          "type": "BOOL",
+          "value": true
+        },
+        "AURORA_DAWN_PROVIDER": "vendor",
+        "AURORA_DAWN_LINKAGE": "static",
+        "AURORA_DAWN_APPLY_OPENXR_PATCH": {
+          "type": "BOOL",
+          "value": true
+        }
+      }
+    },
+    {
       "name": "windows-msvc",
       "displayName": "Windows (MSVC)",
       "generator": "Ninja",
@@ -580,6 +607,12 @@
       "configurePreset": "linux-clang-relwithdebinfo",
       "description": "Linux (Clang) release build with debug info",
       "displayName": "Linux (Clang) RelWithDebInfo"
+    },
+    {
+      "name": "linux-clang-relwithdebinfo-openxr",
+      "configurePreset": "linux-clang-relwithdebinfo-openxr",
+      "description": "Linux Clang vendored Dawn OpenXR build",
+      "displayName": "Linux (Clang, vendored Dawn OpenXR)"
     },
     {
       "name": "macos-default-debug",
